@@ -6,7 +6,13 @@
 
 A userscript that displays Steam game information when hovering over game topic titles on CS.RIN.RU. Get instant access to Steam details and jump straight to the thread's latest page without leaving the forum list!
 
-https://i.imgur.com/3Mk3DwN.png
+<center>
+  <img
+    src="https://i.imgur.com/3Mk3DwN.png"
+    alt="Hover preview demo"
+    style="max-width:100%; margin:8px 0;"
+  />
+</center>
 
 ## Features
 
