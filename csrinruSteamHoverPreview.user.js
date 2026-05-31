@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         CS.RIN.RU - Steam Hover Preview
 // @namespace    https://greasyfork.org/en/users/1340389-deonholo
-// @version      1.1.0
+// @version      1.2.0
 // @description  On-hover Steam thumbnail, description, Steam ratings, tags, release date, Open on Steam, and Open Latest Page for cs.rin.ru forum topics
 // @author       DeonHolo
 // @license      MIT
@@ -30,6 +30,8 @@
     const CONCURRENT_VISIBLE = 3;
     const CONCURRENT_HIDDEN = 4;
     const PRIORITY_PRELOAD_COUNT = 15;
+    const CONCURRENT_TAG_VISIBLE = 1;
+    const CONCURRENT_TAG_HIDDEN = 3;
     const MAX_SEARCH_CANDIDATES = 5;
     const DEBUG_MODE = false;
 
@@ -532,10 +534,12 @@
     }
 
     function warmSteamTags(data) {
-        if (!data?.appId) return;
-        if (getTagSource(data) === 'steam') return;
-        if (data.steamTagsAttemptTs && Date.now() - data.steamTagsAttemptTs < MEMORY_CACHE_TTL) return;
-        if (inFlightTagFetches.has(data.appId)) return;
+        if (!data?.appId) return null;
+        if (getTagSource(data) === 'steam') return null;
+        if (data.steamTagsAttemptTs && Date.now() - data.steamTagsAttemptTs < MEMORY_CACHE_TTL) return null;
+
+        const inFlight = inFlightTagFetches.get(data.appId);
+        if (inFlight) return inFlight;
 
         updateCachedDataForApp(data.appId, (cachedData, now) => ({
             ...cachedData,
@@ -557,6 +561,7 @@
             .finally(() => inFlightTagFetches.delete(data.appId));
 
         inFlightTagFetches.set(data.appId, request);
+        return request;
     }
 
     function normalizeForMatch(value) {
@@ -984,12 +989,30 @@
         }
     }
 
+    async function preloadTagsForNames(names) {
+        let i = 0;
+        while (i < names.length) {
+            await waitForPreloadTurn();
+
+            const batchSize = isPageHidden ? CONCURRENT_TAG_HIDDEN : CONCURRENT_TAG_VISIBLE;
+            const batch = names.slice(i, i + batchSize);
+            await Promise.all(batch.map(async (name) => {
+                const data = await fetchSteamWithFallback(name).catch(() => null);
+                if (data) await warmSteamTags(data);
+            }));
+            i += batchSize;
+            await delay(isPageHidden ? MIN_INTERVAL * 2 : MIN_INTERVAL * 8);
+        }
+    }
+
     async function preloadAll() {
         const names = getPreloadNames();
         debugLog(`Preloading ${names.length} topic previews`);
 
         await preloadNames(names.slice(0, PRIORITY_PRELOAD_COUNT));
         await preloadNames(names.slice(PRIORITY_PRELOAD_COUNT));
+        debugLog(`Warming Steam tags for ${names.length} topic previews`);
+        await preloadTagsForNames(names);
     }
 
     window.addEventListener('load', () => {
