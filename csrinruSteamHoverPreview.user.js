@@ -1,5 +1,5 @@
 // ==UserScript==
-// @name         CS.RIN.RU Steam Hover Preview
+// @name         CS.RIN.RU - Steam Hover Preview
 // @namespace    https://greasyfork.org/en/users/1340389-deonholo
 // @version      1.0.0
 // @description  On-hover Steam thumbnail, description, Steam ratings, tags, release date, Open on Steam, and Open Latest Page for cs.rin.ru forum topics
