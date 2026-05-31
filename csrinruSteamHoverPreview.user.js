@@ -27,7 +27,9 @@
     const FADE_DURATION = 180;
     const API_TIMEOUT = 8000;
     const STORAGE_KEY = 'csrinruSteamHoverCache_v1';
+    const CONCURRENT_VISIBLE = 3;
     const CONCURRENT_HIDDEN = 4;
+    const PRIORITY_PRELOAD_COUNT = 15;
     const MAX_SEARCH_CANDIDATES = 5;
     const DEBUG_MODE = false;
 
@@ -35,6 +37,7 @@
     tip.className = 'csrinruSteamHoverTip';
 
     let lastRequest = 0;
+    let requestGate = Promise.resolve();
     let hoverId = 0;
     let showTimeout = null;
     let hideTimeout = null;
@@ -46,6 +49,8 @@
     let isPageHidden = document.hidden || false;
 
     const apiCache = new Map();
+    const inFlightFetches = new Map();
+    const inFlightTagFetches = new Map();
 
     function debugLog(...args) {
         if (DEBUG_MODE) console.log('[CS.RIN.RU Steam Hover]', ...args);
@@ -67,6 +72,10 @@
         } catch (_) {
             return href || '';
         }
+    }
+
+    function delay(ms) {
+        return new Promise(resolve => setTimeout(resolve, ms));
     }
 
     function getTopicId(href) {
@@ -122,8 +131,22 @@
         }
     }
 
+    function getFreshCacheEntry(name, now = Date.now()) {
+        const hit = apiCache.get(name);
+        if (!hit) return null;
+
+        if (now - hit.ts < (hit.data ? CACHE_TTL : MEMORY_CACHE_TTL)) {
+            return hit;
+        }
+
+        apiCache.delete(name);
+        return null;
+    }
+
     window.clearCsrinruSteamHoverCache = function () {
         apiCache.clear();
+        inFlightFetches.clear();
+        inFlightTagFetches.clear();
         GM_setValue(STORAGE_KEY, '{}');
         console.log('[CS.RIN.RU Steam Hover] Cache cleared. Refresh the page to re-fetch games.');
     };
@@ -356,9 +379,17 @@
         return { link, row, rawTitle, gameName, topicUrl, latestUrl };
     }
 
-    function gmFetch(url, responseType = 'json', timeout = API_TIMEOUT) {
+    async function waitForRequestSlot() {
         const wait = Math.max(0, MIN_INTERVAL - (Date.now() - lastRequest));
-        return new Promise(resolve => setTimeout(resolve, wait))
+        if (wait) await delay(wait);
+        lastRequest = Date.now();
+    }
+
+    function gmFetch(url, responseType = 'json', timeout = API_TIMEOUT) {
+        const slot = requestGate.then(waitForRequestSlot, waitForRequestSlot);
+        requestGate = slot.catch(() => null);
+
+        return slot
             .then(() => new Promise((resolve, reject) => {
                 lastRequest = Date.now();
                 GM_xmlhttpRequest({
@@ -459,6 +490,75 @@
         };
     }
 
+    function getGenreTags(appData) {
+        return (appData?.genres || [])
+            .map(genre => genre.description)
+            .filter(Boolean)
+            .slice(0, 5);
+    }
+
+    function getTagSource(data) {
+        if (data?.tagsSource) return data.tagsSource;
+        return data?.tags?.length ? 'steam' : 'genres';
+    }
+
+    function updateCachedDataForApp(appId, updater) {
+        let updated = false;
+        const now = Date.now();
+
+        for (const [key, value] of apiCache.entries()) {
+            if (value.data?.appId !== appId) continue;
+
+            apiCache.set(key, {
+                ...value,
+                data: updater(value.data, now),
+                ts: now
+            });
+            updated = true;
+        }
+
+        if (updated) savePersistentCache();
+    }
+
+    async function fetchSteamTags(appId) {
+        const storeHtml = await gmFetch(`https://store.steampowered.com/app/${appId}/`, 'text');
+        if (!storeHtml) return [];
+
+        const doc = new DOMParser().parseFromString(storeHtml, 'text/html');
+        return Array.from(doc.querySelectorAll('a.app_tag'))
+            .map(el => el.textContent.trim())
+            .filter(tag => tag && tag !== '+')
+            .slice(0, 5);
+    }
+
+    function warmSteamTags(data) {
+        if (!data?.appId) return;
+        if (getTagSource(data) === 'steam') return;
+        if (data.steamTagsAttemptTs && Date.now() - data.steamTagsAttemptTs < MEMORY_CACHE_TTL) return;
+        if (inFlightTagFetches.has(data.appId)) return;
+
+        updateCachedDataForApp(data.appId, (cachedData, now) => ({
+            ...cachedData,
+            steamTagsAttemptTs: now
+        }));
+
+        const request = fetchSteamTags(data.appId)
+            .then(tags => {
+                if (!tags.length) return;
+
+                updateCachedDataForApp(data.appId, (cachedData, now) => ({
+                    ...cachedData,
+                    tags,
+                    tagsSource: 'steam',
+                    steamTagsAttemptTs: now
+                }));
+            })
+            .catch(() => null)
+            .finally(() => inFlightTagFetches.delete(data.appId));
+
+        inFlightTagFetches.set(data.appId, request);
+    }
+
     function normalizeForMatch(value) {
         return String(value ?? '')
             .toLowerCase()
@@ -516,13 +616,21 @@
 
     async function fetchSteam(name) {
         const now = Date.now();
-        const hit = apiCache.get(name);
-        if (hit && now - hit.ts < (hit.data ? CACHE_TTL : MEMORY_CACHE_TTL)) {
+        const hit = getFreshCacheEntry(name, now);
+        if (hit) {
             return hit.data;
-        } else if (hit) {
-            apiCache.delete(name);
         }
 
+        const inFlight = inFlightFetches.get(name);
+        if (inFlight) return inFlight;
+
+        const request = fetchSteamUncached(name, now)
+            .finally(() => inFlightFetches.delete(name));
+        inFlightFetches.set(name, request);
+        return request;
+    }
+
+    async function fetchSteamUncached(name, now) {
         let appId = null;
         let appData = null;
         let reviewInfo = null;
@@ -606,26 +714,13 @@
             }
         }
 
-        let tags = [];
-        if (appData) {
-            try {
-                const storeHtml = await gmFetch(`https://store.steampowered.com/app/${appId}/`, 'text');
-                if (storeHtml) {
-                    const doc = new DOMParser().parseFromString(storeHtml, 'text/html');
-                    tags = Array.from(doc.querySelectorAll('a.app_tag'))
-                        .map(el => el.textContent.trim())
-                        .filter(tag => tag && tag !== '+')
-                        .slice(0, 5);
-                }
-            } catch (_) {
-                tags = (appData.genres || []).map(g => g.description).slice(0, 5);
-            }
-        }
+        const tags = getGenreTags(appData);
 
         const data = {
             ...appData,
             appId,
             tags,
+            tagsSource: 'genres',
             reviewInfo,
             releaseDate: appData.release_date?.date || null,
             storeUrl: `https://store.steampowered.com/app/${appId}/`
@@ -745,8 +840,9 @@
         const releaseDate = escapeHtml(data.releaseDate || '');
         const storeUrl = escapeHtml(data.storeUrl || `https://store.steampowered.com/search/?term=${encodeURIComponent(gameName)}`);
         const latestUrl = escapeHtml(topicInfo.latestUrl);
+        const tagLabel = getTagSource(data) === 'steam' ? 'Tags' : 'Genres';
         const tagsHtml = data.tags?.length ?
-            `<p class="steamTags"><strong>Tags:</strong> ${data.tags.map(escapeHtml).join(' • ')}</p>` :
+            `<p class="steamTags"><strong>${tagLabel}:</strong> ${data.tags.map(escapeHtml).join(' • ')}</p>` :
             '';
         const reviewHtml = (data.reviewInfo && data.reviewInfo.desc !== 'N/A' && data.reviewInfo.desc !== 'No Reviews') ?
             `<p class="steamRating"><strong>Rating:</strong> ${getRatingStars(data.reviewInfo.percent, data.reviewInfo.desc)}<span class="ratingText">${escapeHtml(data.reviewInfo.desc)}${data.reviewInfo.total ? `  |  ${escapeHtml(data.reviewInfo.total.toLocaleString())} reviews` : ''}</span></p>` :
@@ -809,8 +905,12 @@
             const data = await fetchSteamWithFallback(topicInfo.gameName);
             if (hoverId !== thisId || currentHoveredLink !== targetLink) return;
 
-            if (data) renderSteamData(data, topicInfo.gameName, topicInfo);
-            else renderNoData(topicInfo.gameName, topicInfo);
+            if (data) {
+                renderSteamData(data, topicInfo.gameName, topicInfo);
+                warmSteamTags(data);
+            } else {
+                renderNoData(topicInfo.gameName, topicInfo);
+            }
 
             positionTip(lastMoveEvent);
             trackingMove = false;
@@ -840,29 +940,56 @@
         await Promise.all(names.map(name => fetchSteamWithFallback(name).catch(() => null)));
     }
 
-    async function preloadAll() {
+    async function waitForPreloadTurn() {
+        while (userHovering && !isPageHidden) {
+            await delay(200);
+        }
+    }
+
+    function getPreloadNames() {
         const infos = Array.from(document.querySelectorAll(TOPIC_SELECTOR))
             .map(getTopicInfo)
             .filter(Boolean);
-        const names = [...new Set(infos.map(info => info.gameName).filter(name => name && !apiCache.has(name)))];
 
+        const seen = new Set();
+        const ranked = [];
+        infos.forEach((info, index) => {
+            const name = info.gameName;
+            if (!name || seen.has(name) || getFreshCacheEntry(name)) return;
+
+            seen.add(name);
+            const rect = info.link.getBoundingClientRect();
+            ranked.push({
+                name,
+                index,
+                inViewport: rect.bottom >= 0 && rect.top <= window.innerHeight
+            });
+        });
+
+        return ranked
+            .sort((a, b) => Number(b.inViewport) - Number(a.inViewport) || a.index - b.index)
+            .map(item => item.name);
+    }
+
+    async function preloadNames(names) {
         let i = 0;
         while (i < names.length) {
-            while (userHovering && !isPageHidden) {
-                await new Promise(resolve => setTimeout(resolve, 200));
-            }
+            await waitForPreloadTurn();
 
-            if (isPageHidden) {
-                const batch = names.slice(i, i + CONCURRENT_HIDDEN);
-                await fetchBatch(batch);
-                i += CONCURRENT_HIDDEN;
-                await new Promise(resolve => setTimeout(resolve, MIN_INTERVAL));
-            } else {
-                await fetchSteamWithFallback(names[i]).catch(() => null);
-                i++;
-                await new Promise(resolve => setTimeout(resolve, MIN_INTERVAL * 2));
-            }
+            const batchSize = isPageHidden ? CONCURRENT_HIDDEN : CONCURRENT_VISIBLE;
+            const batch = names.slice(i, i + batchSize);
+            await fetchBatch(batch);
+            i += batchSize;
+            await delay(isPageHidden ? MIN_INTERVAL : MIN_INTERVAL * 2);
         }
+    }
+
+    async function preloadAll() {
+        const names = getPreloadNames();
+        debugLog(`Preloading ${names.length} topic previews`);
+
+        await preloadNames(names.slice(0, PRIORITY_PRELOAD_COUNT));
+        await preloadNames(names.slice(PRIORITY_PRELOAD_COUNT));
     }
 
     window.addEventListener('load', () => {
