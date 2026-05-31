@@ -4,8 +4,13 @@
 </p>
 
 <center>
-  <p><em>Preview image coming soon.</em></p>
+  <img
+    src="https://i.imgur.com/3Mk3DwN.png"
+    alt="Hover preview demo"
+    style="max-width:100%; margin:8px 0;"
+  />
 </center>
+
 
 <hr>
 
