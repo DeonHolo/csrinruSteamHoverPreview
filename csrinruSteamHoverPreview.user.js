@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         CS.RIN.RU - Steam Hover Preview
 // @namespace    https://greasyfork.org/en/users/1340389-deonholo
-// @version      1.0.0
+// @version      1.1.0
 // @description  On-hover Steam thumbnail, description, Steam ratings, tags, release date, Open on Steam, and Open Latest Page for cs.rin.ru forum topics
 // @author       DeonHolo
 // @license      MIT
@@ -50,7 +50,6 @@
 
     const apiCache = new Map();
     const inFlightFetches = new Map();
-    const inFlightTagFetches = new Map();
 
     function debugLog(...args) {
         if (DEBUG_MODE) console.log('[CS.RIN.RU Steam Hover]', ...args);
@@ -146,7 +145,6 @@
     window.clearCsrinruSteamHoverCache = function () {
         apiCache.clear();
         inFlightFetches.clear();
-        inFlightTagFetches.clear();
         GM_setValue(STORAGE_KEY, '{}');
         console.log('[CS.RIN.RU Steam Hover] Cache cleared. Refresh the page to re-fetch games.');
     };
@@ -490,75 +488,6 @@
         };
     }
 
-    function getGenreTags(appData) {
-        return (appData?.genres || [])
-            .map(genre => genre.description)
-            .filter(Boolean)
-            .slice(0, 5);
-    }
-
-    function getTagSource(data) {
-        if (data?.tagsSource) return data.tagsSource;
-        return data?.tags?.length ? 'steam' : 'genres';
-    }
-
-    function updateCachedDataForApp(appId, updater) {
-        let updated = false;
-        const now = Date.now();
-
-        for (const [key, value] of apiCache.entries()) {
-            if (value.data?.appId !== appId) continue;
-
-            apiCache.set(key, {
-                ...value,
-                data: updater(value.data, now),
-                ts: now
-            });
-            updated = true;
-        }
-
-        if (updated) savePersistentCache();
-    }
-
-    async function fetchSteamTags(appId) {
-        const storeHtml = await gmFetch(`https://store.steampowered.com/app/${appId}/`, 'text');
-        if (!storeHtml) return [];
-
-        const doc = new DOMParser().parseFromString(storeHtml, 'text/html');
-        return Array.from(doc.querySelectorAll('a.app_tag'))
-            .map(el => el.textContent.trim())
-            .filter(tag => tag && tag !== '+')
-            .slice(0, 5);
-    }
-
-    function warmSteamTags(data) {
-        if (!data?.appId) return;
-        if (getTagSource(data) === 'steam') return;
-        if (data.steamTagsAttemptTs && Date.now() - data.steamTagsAttemptTs < MEMORY_CACHE_TTL) return;
-        if (inFlightTagFetches.has(data.appId)) return;
-
-        updateCachedDataForApp(data.appId, (cachedData, now) => ({
-            ...cachedData,
-            steamTagsAttemptTs: now
-        }));
-
-        const request = fetchSteamTags(data.appId)
-            .then(tags => {
-                if (!tags.length) return;
-
-                updateCachedDataForApp(data.appId, (cachedData, now) => ({
-                    ...cachedData,
-                    tags,
-                    tagsSource: 'steam',
-                    steamTagsAttemptTs: now
-                }));
-            })
-            .catch(() => null)
-            .finally(() => inFlightTagFetches.delete(data.appId));
-
-        inFlightTagFetches.set(data.appId, request);
-    }
-
     function normalizeForMatch(value) {
         return String(value ?? '')
             .toLowerCase()
@@ -714,13 +643,26 @@
             }
         }
 
-        const tags = getGenreTags(appData);
+        let tags = [];
+        if (appData) {
+            try {
+                const storeHtml = await gmFetch(`https://store.steampowered.com/app/${appId}/`, 'text');
+                if (storeHtml) {
+                    const doc = new DOMParser().parseFromString(storeHtml, 'text/html');
+                    tags = Array.from(doc.querySelectorAll('a.app_tag'))
+                        .map(el => el.textContent.trim())
+                        .filter(tag => tag && tag !== '+')
+                        .slice(0, 5);
+                }
+            } catch (_) {
+                tags = (appData.genres || []).map(g => g.description).slice(0, 5);
+            }
+        }
 
         const data = {
             ...appData,
             appId,
             tags,
-            tagsSource: 'genres',
             reviewInfo,
             releaseDate: appData.release_date?.date || null,
             storeUrl: `https://store.steampowered.com/app/${appId}/`
@@ -840,9 +782,8 @@
         const releaseDate = escapeHtml(data.releaseDate || '');
         const storeUrl = escapeHtml(data.storeUrl || `https://store.steampowered.com/search/?term=${encodeURIComponent(gameName)}`);
         const latestUrl = escapeHtml(topicInfo.latestUrl);
-        const tagLabel = getTagSource(data) === 'steam' ? 'Tags' : 'Genres';
         const tagsHtml = data.tags?.length ?
-            `<p class="steamTags"><strong>${tagLabel}:</strong> ${data.tags.map(escapeHtml).join(' • ')}</p>` :
+            `<p class="steamTags"><strong>Tags:</strong> ${data.tags.map(escapeHtml).join(' • ')}</p>` :
             '';
         const reviewHtml = (data.reviewInfo && data.reviewInfo.desc !== 'N/A' && data.reviewInfo.desc !== 'No Reviews') ?
             `<p class="steamRating"><strong>Rating:</strong> ${getRatingStars(data.reviewInfo.percent, data.reviewInfo.desc)}<span class="ratingText">${escapeHtml(data.reviewInfo.desc)}${data.reviewInfo.total ? `  |  ${escapeHtml(data.reviewInfo.total.toLocaleString())} reviews` : ''}</span></p>` :
@@ -905,12 +846,8 @@
             const data = await fetchSteamWithFallback(topicInfo.gameName);
             if (hoverId !== thisId || currentHoveredLink !== targetLink) return;
 
-            if (data) {
-                renderSteamData(data, topicInfo.gameName, topicInfo);
-                warmSteamTags(data);
-            } else {
-                renderNoData(topicInfo.gameName, topicInfo);
-            }
+            if (data) renderSteamData(data, topicInfo.gameName, topicInfo);
+            else renderNoData(topicInfo.gameName, topicInfo);
 
             positionTip(lastMoveEvent);
             trackingMove = false;
