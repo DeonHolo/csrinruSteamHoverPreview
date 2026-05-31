@@ -1,7 +1,3 @@
-<p align="center">
-  <strong>CS.RIN.RU - Steam Hover Preview</strong>
-</p>
-
 # CS.RIN.RU Steam Hover Preview
 
 A userscript that displays Steam game information when hovering over game topic titles on CS.RIN.RU. Get instant access to Steam details and jump straight to the thread's latest page without leaving the forum list!
