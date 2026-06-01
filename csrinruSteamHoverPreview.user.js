@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         CS.RIN.RU - Steam Hover Preview
 // @namespace    https://greasyfork.org/en/users/1340389-deonholo
-// @version      1.2.0
+// @version      1.3.0
 // @description  On-hover Steam thumbnail, description, Steam ratings, tags, release date, Open on Steam, and Open Latest Page for cs.rin.ru forum topics
 // @author       DeonHolo
 // @license      MIT
@@ -78,6 +78,37 @@
 
     function delay(ms) {
         return new Promise(resolve => setTimeout(resolve, ms));
+    }
+
+    async function copyText(text) {
+        if (!text) return false;
+
+        try {
+            if (navigator.clipboard?.writeText) {
+                await navigator.clipboard.writeText(text);
+                return true;
+            }
+        } catch (_) {
+            // Fall through to the textarea copy path.
+        }
+
+        const textarea = document.createElement('textarea');
+        textarea.value = text;
+        textarea.setAttribute('readonly', '');
+        textarea.style.position = 'fixed';
+        textarea.style.left = '-9999px';
+        document.body.appendChild(textarea);
+        textarea.select();
+
+        let copied = false;
+        try {
+            copied = document.execCommand('copy');
+        } catch (_) {
+            copied = false;
+        }
+
+        textarea.remove();
+        return copied;
     }
 
     function getTopicId(href) {
@@ -201,15 +232,31 @@
         }
         .csrinruSteamHoverTip .steamRating,
         .csrinruSteamHoverTip .steamTags,
+        .csrinruSteamHoverTip .steamAppId,
         .csrinruSteamHoverTip .steamReleaseDate {
             margin-top: 8px;
             font-size: 12px;
             color: #c1cccc;
         }
-        .csrinruSteamHoverTip .steamReleaseDate {
+        .csrinruSteamHoverTip .steamReleaseDate,
+        .csrinruSteamHoverTip .steamAppId {
             margin-top: 2px;
             font-size: 11px;
             color: #a8b4b8;
+        }
+        .csrinruSteamHoverTip .copyAppIdBtn {
+            display: inline;
+            margin: 0;
+            padding: 0;
+            border: 0;
+            background: transparent;
+            color: #99d2f7;
+            font: inherit;
+            text-decoration: underline;
+            cursor: pointer;
+        }
+        .csrinruSteamHoverTip .copyAppIdBtn:hover {
+            color: #c7ebff;
         }
         .csrinruSteamHoverTip .ratingStars {
             color: #f5c518;
@@ -845,6 +892,8 @@
         const releaseDate = escapeHtml(data.releaseDate || '');
         const storeUrl = escapeHtml(data.storeUrl || `https://store.steampowered.com/search/?term=${encodeURIComponent(gameName)}`);
         const latestUrl = escapeHtml(topicInfo.latestUrl);
+        const rawAppId = data.appId || data.steam_appid || '';
+        const appId = escapeHtml(rawAppId);
         const tagLabel = getTagSource(data) === 'steam' ? 'Tags' : 'Genres';
         const tagsHtml = data.tags?.length ?
             `<p class="steamTags"><strong>${tagLabel}:</strong> ${data.tags.map(escapeHtml).join(' • ')}</p>` :
@@ -855,11 +904,15 @@
         const releaseDateHtml = data.releaseDate ?
             `<p class="steamReleaseDate"><strong>Released:</strong> ${releaseDate}</p>` :
             '';
+        const appIdHtml = rawAppId ?
+            `<p class="steamAppId"><strong>AppID:</strong> <button type="button" class="copyAppIdBtn" data-app-id="${appId}" title="Copy Steam AppID">${appId}</button></p>` :
+            '';
 
         tip.innerHTML = `
             ${data.header_image ? `<img src="${headerImage}" alt="${title}" onerror="this.style.display='none'">` : ''}
             <p><strong>${title}</strong></p>
             ${releaseDateHtml}
+            ${appIdHtml}
             <p>${shortDescription}</p>
             ${reviewHtml}
             ${tagsHtml}
@@ -876,6 +929,27 @@
     });
 
     tip.addEventListener('mouseleave', scheduleHideTip);
+
+    tip.addEventListener('click', async (e) => {
+        const appIdButton = e.target.closest('.copyAppIdBtn');
+        if (!appIdButton) return;
+
+        e.preventDefault();
+        e.stopPropagation();
+
+        const appId = appIdButton.dataset.appId;
+        const copied = await copyText(appId);
+        if (!copied) {
+            window.prompt('Copy Steam AppID:', appId);
+            return;
+        }
+
+        const previousText = appIdButton.textContent;
+        appIdButton.textContent = 'Copied';
+        setTimeout(() => {
+            appIdButton.textContent = previousText;
+        }, 900);
+    });
 
     document.addEventListener('mouseover', (e) => {
         const targetLink = e.target.closest(TOPIC_SELECTOR);
