@@ -6,6 +6,8 @@
 // @author       DeonHolo
 // @license      MIT
 // @icon         https://i.ibb.co/zXtW7WD/csrinfavicon32.png
+// @iconURL      https://i.ibb.co/zXtW7WD/csrinfavicon32.png
+// @defaulticon  https://i.ibb.co/zXtW7WD/csrinfavicon32.png
 // @match        *://cs.rin.ru/forum/*
 // @match        *://*.cs.rin.ru/forum/*
 // @grant        GM_xmlhttpRequest
@@ -249,7 +251,7 @@
             display: flex;
             justify-content: space-between;
             align-items: baseline;
-            flex-wrap: wrap;
+            flex-wrap: nowrap;
             gap: 3px 10px;
         }
         .csrinruSteamHoverTip .steamAppIdControl {
@@ -289,10 +291,11 @@
         .csrinruSteamHoverTip .threadTagList {
             display: flex;
             justify-content: flex-end;
-            flex-wrap: wrap;
+            flex-wrap: nowrap;
             gap: 0 4px;
             margin-left: auto;
             min-width: 0;
+            overflow: hidden;
         }
         .csrinruSteamHoverTip .steamMetaRowTagsOnly .threadTagList {
             justify-content: flex-start;
@@ -300,6 +303,10 @@
         }
         .csrinruSteamHoverTip .threadTag {
             white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            min-width: 0;
+            max-width: 170px;
         }
         .csrinruSteamHoverTip .threadTagText {
             font-size: 0.9em;
