@@ -9,7 +9,7 @@ This design adds two small power-user affordances without turning the script int
 - Add a SteamDB outbound link beside the AppID.
 - Show CS.RIN.RU thread status tags in the hover card using the original CS.RIN.RU Enhanced tag-coloring style.
 
-The original CS.RIN.RU Enhanced script colors bracketed tags with a deterministic text-to-color function. This script will adapt that idea as a visible tribute while keeping the behavior scoped to the hover card.
+The current SubZeroPL CS.RIN.RU Enhanced script colors bracketed tags with a deterministic text-to-color function that also checks the element's real background color. This script will adapt that behavior as a visible tribute while keeping the behavior scoped to the hover card.
 
 ## Scope
 
@@ -42,34 +42,41 @@ Thread tags will sit on the opposite side of the same row when there is room. Th
 
 The hover card will not duplicate noisy label text. The tags themselves carry enough meaning, and labels would consume too much width.
 
-## Tag Color Rules
+## OG Tag Behavior
 
 Tags are extracted from the raw CS.RIN.RU topic title before cleanup. Each complete bracketed token is colorized independently.
 
-The color generator will match the original CS.RIN.RU Enhanced algorithm:
+The current OG behavior is:
 
-- Convert tag text to lowercase.
-- Hash the text deterministically.
-- Derive a hex color from the hash.
-- Use the same color for the brackets and inner text.
-- Slightly reduce inner text size only if needed to match the OG visual style.
+- Scan `.titles` and `.topictitle` elements.
+- Skip elements already marked with `id="colorize"`.
+- Extract bracketed tags with `/\[([^\]]+)]/g`.
+- Pass each full bracketed tag and the title's parent element into the color function.
+- Replace the original tag with three spans: opening bracket, inner text, closing bracket.
+- Use the generated color for all three spans.
+- Render the inner text at `font-size: 0.9em`.
 
-Example expected colors from the OG algorithm:
+The current OG color function is:
 
-- `[Info]` -> blue
-- `[CRACKED]` -> red/pink
-- `[Pre-Release]` and `[Early Access]` -> yellow-green
-- `[NOT CRACKED / HYPERVISOR]` -> blue/purple
+- Lowercase the full tag text, including brackets.
+- Build a numeric hash with the JavaScript string-hash pattern `charCode + ((hash << 5) - hash)`.
+- Convert `Math.abs((Math.sin(hash) * 10000) % 1 * 16777216)` to a hex color.
+- Walk upward from the parent element until `getComputedStyle(...).backgroundColor` is a real `rgb(r, g, b)` value.
+- Compare the sum of the candidate color's RGB channels with the sum of the background RGB channels.
+- While the absolute difference is less than `300`, rehash with `(hash << 5) - hash` and generate another color.
+- Return the final padded hex color.
 
-The implementation will not add contrast adjustment in this iteration, because the goal is recognizable OG-style color parity.
+Because the OG function rerolls based on the live background color, colors are not universal constants. On the screenshot background sampled from the user-provided image, the page background is `rgb(28, 28, 28)`, so the copied function will produce the same visible palette the user sees there. The implementation will not hard-code a color table for tags such as `[Info]`, `[CRACKED]`, or `[Early Access]`.
+
+The hover card uses an `rgba(...)` background, while the OG function looks specifically for `rgb(...)`. To preserve parity, tag colors will be generated from the original topic title context, using the same source parent/background that the OG script would use on the forum list. The generated color is then rendered inside the hover card.
 
 ## Architecture
 
 Add small parsing/rendering helpers near the existing topic-info and rendering helpers:
 
 - `extractThreadTags(rawTitle)` returns an ordered, de-duplicated list of bracketed tags.
-- `colorizeThreadTag(tag)` returns an OG-style deterministic color.
-- `renderThreadTags(tags)` returns escaped tag HTML with inline or CSS-variable colors.
+- `colorizeThreadTag(tag, sourceParent)` returns an OG-style deterministic color using the topic title's original parent/background context.
+- `renderThreadTags(tags, sourceParent)` returns escaped tag HTML with inline or CSS-variable colors.
 - `getSteamDbUrl(appId)` returns the SteamDB URL or an empty string.
 
 Extend `getTopicInfo(link)` to include `threadTags`, derived from `rawTitle`. Keep `cleanName(rawTitle)` unchanged so Steam matching behavior remains stable.
