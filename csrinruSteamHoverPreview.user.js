@@ -5,6 +5,7 @@
 // @description  On-hover Steam thumbnail, description, ratings, tags, AppID, SteamDB, Open on Steam, and Open Latest Page for cs.rin.ru forum topics
 // @author       DeonHolo
 // @license      MIT
+// @icon         https://i.ibb.co/zXtW7WD/csrinfavicon32.png
 // @match        *://cs.rin.ru/forum/*
 // @match        *://*.cs.rin.ru/forum/*
 // @grant        GM_xmlhttpRequest
