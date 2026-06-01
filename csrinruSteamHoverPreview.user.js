@@ -1,13 +1,13 @@
 // ==UserScript==
 // @name         CS.RIN.RU - Steam Hover Preview
 // @namespace    https://greasyfork.org/en/users/1340389-deonholo
-// @version      2.1
+// @version      2.2
 // @description  On-hover Steam thumbnail, description, ratings, tags, AppID, SteamDB, Open on Steam, and Open Latest Page for cs.rin.ru forum topics
 // @author       DeonHolo
 // @license      MIT
-// @icon         https://i.ibb.co/zXtW7WD/csrinfavicon32.png
-// @iconURL      https://i.ibb.co/zXtW7WD/csrinfavicon32.png
-// @defaulticon  https://i.ibb.co/zXtW7WD/csrinfavicon32.png
+// @icon         https://raw.githubusercontent.com/SubZeroPL/cs-rin-ru-enhanced-mod/master/image.png
+// @iconURL      https://raw.githubusercontent.com/SubZeroPL/cs-rin-ru-enhanced-mod/master/image.png
+// @defaulticon  https://raw.githubusercontent.com/SubZeroPL/cs-rin-ru-enhanced-mod/master/image.png
 // @match        *://cs.rin.ru/forum/*
 // @match        *://*.cs.rin.ru/forum/*
 // @grant        GM_xmlhttpRequest
