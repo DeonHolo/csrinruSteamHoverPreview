@@ -33,6 +33,14 @@
         Includes a direct “🎮 Open on Steam” link and a “↗️ Open Latest Page” link that jumps to the latest page of the CS.RIN.RU thread.
     </li>
     <li>
+        <strong>AppID & SteamDB Utility</strong><br>
+        Shows the matched Steam AppID, lets you click it to copy, and adds a compact SteamDB shortcut beside it.
+    </li>
+    <li>
+        <strong>Colored CS.RIN.RU Thread Tags</strong><br>
+        Shows bracketed topic tags in the hover card using OG CS.RIN.RU Enhanced-style colors.
+    </li>
+    <li>
         <strong>Forum-Aware Title Cleanup</strong><br>
         Cleans topic labels like "[Info]", "[CRACKED]", "[NOT CRACKED]", build/update text, and platform notes before searching Steam.
     </li>

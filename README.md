@@ -1,4 +1,4 @@
-# CS.RIN.RU Steam Hover Preview
+# ![Icon of CS.RIN.RU](https://i.ibb.co/zXtW7WD/csrinfavicon32.png) CS.RIN.RU Steam Hover Preview
 
 A userscript that displays Steam game information when hovering over game topic titles on CS.RIN.RU. Get instant access to Steam details and jump straight to the thread's latest page without leaving the forum list!
 
@@ -17,6 +17,8 @@ A userscript that displays Steam game information when hovering over game topic 
 - **⭐ Steam Ratings** - Visual star rating with review summary and count
 - **🏷️ User-Defined Tags** - Actual Steam community tags (Survival Horror, RPG, etc.)
 - **📅 Release Date** - Game release information
+- **🆔 AppID Utility** - Click the Steam AppID to copy it, or use the small external link to open SteamDB
+- **🎨 CS.RIN Thread Tags** - Shows bracketed topic tags in the hover card with OG CS.RIN.RU Enhanced-style colors
 - **🎮 Open on Steam** - Direct link to Steam store page
 - **↗️ Open Latest Page** - Opens the latest page of the CS.RIN.RU topic, where new links and updates are usually posted
 - **🧹 Topic Cleanup** - Cleans forum title tags like `[Info]`, `[CRACKED]`, `[NOT CRACKED]`, build/update labels, and platform notes before searching Steam
@@ -48,7 +50,7 @@ The script works on CS.RIN.RU forum pages:
 3. The script extracts and cleans the game name from the topic title
 4. Searches Steam for a matching base game
 5. Displays a tooltip with Steam information
-6. Use `🎮 Open on Steam` or `↗️ Open Latest Page` from the hover preview
+6. Copy the AppID, open SteamDB, or use `🎮 Open on Steam` / `↗️ Open Latest Page` from the hover preview
 
 ## Technical Details
 

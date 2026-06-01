@@ -1,8 +1,8 @@
 // ==UserScript==
 // @name         CS.RIN.RU - Steam Hover Preview
 // @namespace    https://greasyfork.org/en/users/1340389-deonholo
-// @version      1.3.0
-// @description  On-hover Steam thumbnail, description, Steam ratings, tags, release date, Open on Steam, and Open Latest Page for cs.rin.ru forum topics
+// @version      2.0
+// @description  On-hover Steam thumbnail, description, ratings, tags, AppID, SteamDB, Open on Steam, and Open Latest Page for cs.rin.ru forum topics
 // @author       DeonHolo
 // @license      MIT
 // @match        *://cs.rin.ru/forum/*
@@ -232,17 +232,30 @@
         }
         .csrinruSteamHoverTip .steamRating,
         .csrinruSteamHoverTip .steamTags,
-        .csrinruSteamHoverTip .steamAppId,
+        .csrinruSteamHoverTip .steamMetaRow,
         .csrinruSteamHoverTip .steamReleaseDate {
             margin-top: 8px;
             font-size: 12px;
             color: #c1cccc;
         }
         .csrinruSteamHoverTip .steamReleaseDate,
-        .csrinruSteamHoverTip .steamAppId {
+        .csrinruSteamHoverTip .steamMetaRow {
             margin-top: 2px;
             font-size: 11px;
             color: #a8b4b8;
+        }
+        .csrinruSteamHoverTip .steamMetaRow {
+            display: flex;
+            justify-content: space-between;
+            align-items: baseline;
+            flex-wrap: wrap;
+            gap: 3px 10px;
+        }
+        .csrinruSteamHoverTip .steamAppIdControl {
+            display: inline-flex;
+            align-items: baseline;
+            gap: 4px;
+            flex-shrink: 0;
         }
         .csrinruSteamHoverTip .copyAppIdBtn {
             display: inline;
@@ -257,6 +270,38 @@
         }
         .csrinruSteamHoverTip .copyAppIdBtn:hover {
             color: #c7ebff;
+        }
+        .csrinruSteamHoverTip .steamDbLink,
+        .csrinruSteamHoverTip .steamDbLink:visited {
+            display: inline-block;
+            padding: 0 2px;
+            color: #99d2f7 !important;
+            font-weight: bold;
+            line-height: 1;
+            text-decoration: none;
+        }
+        .csrinruSteamHoverTip .steamDbLink:hover,
+        .csrinruSteamHoverTip .steamDbLink:visited:hover {
+            color: #c7ebff !important;
+            text-decoration: underline;
+        }
+        .csrinruSteamHoverTip .threadTagList {
+            display: flex;
+            justify-content: flex-end;
+            flex-wrap: wrap;
+            gap: 0 4px;
+            margin-left: auto;
+            min-width: 0;
+        }
+        .csrinruSteamHoverTip .steamMetaRowTagsOnly .threadTagList {
+            justify-content: flex-start;
+            margin-left: 0;
+        }
+        .csrinruSteamHoverTip .threadTag {
+            white-space: nowrap;
+        }
+        .csrinruSteamHoverTip .threadTagText {
+            font-size: 0.9em;
         }
         .csrinruSteamHoverTip .ratingStars {
             color: #f5c518;
@@ -387,6 +432,91 @@
         return topicUrl;
     }
 
+    function extractThreadTags(rawTitle) {
+        const matches = rawTitle?.match(/\[([^\]]+)]/g) || [];
+        const seen = new Set();
+
+        return matches.filter((tag) => {
+            const key = tag.toLowerCase();
+            if (key === '[info]') return false;
+            if (seen.has(key)) return false;
+            seen.add(key);
+            return true;
+        });
+    }
+
+    function hexToRgb(hex) {
+        return [
+            parseInt(hex.substring(0, 2), 16),
+            parseInt(hex.substring(2, 4), 16),
+            parseInt(hex.substring(4, 6), 16)
+        ];
+    }
+
+    function getBackgroundRgb(sourceParent) {
+        let parent = sourceParent;
+
+        while (parent) {
+            const bg = getComputedStyle(parent).getPropertyValue('background-color');
+            const matches = bg.match(/^rgb\((\d+),\s*(\d+),\s*(\d+)\)$/);
+            if (matches) {
+                return [parseInt(matches[1], 10), parseInt(matches[2], 10), parseInt(matches[3], 10)];
+            }
+            parent = parent.parentElement;
+        }
+
+        return [28, 28, 28];
+    }
+
+    // Mirrors CS.RIN.RU Enhanced's deterministic custom-tag color algorithm.
+    function colorizeThreadTag(tag, sourceParent) {
+        let hash = 0;
+        const lowerTag = tag.toLowerCase();
+        for (let i = 0; i < lowerTag.length; i++) {
+            hash = lowerTag.charCodeAt(i) + ((hash << 5) - hash);
+        }
+
+        let color = Math.floor(Math.abs((Math.sin(hash) * 10000) % 1 * 16777216)).toString(16);
+        let rgb = hexToRgb(color);
+        const bgRgb = getBackgroundRgb(sourceParent);
+
+        while (Math.abs(rgb[0] + rgb[1] + rgb[2] - (bgRgb[0] + bgRgb[1] + bgRgb[2])) < 300) {
+            hash = (hash << 5) - hash;
+            color = Math.floor(Math.abs((Math.sin(hash) * 10000) % 1 * 16777216)).toString(16);
+            rgb = hexToRgb(color);
+        }
+
+        return `#${color.padStart(6, '0')}`;
+    }
+
+    function renderThreadTags(tags, sourceParent) {
+        if (!tags?.length) return '';
+
+        return `<span class="threadTagList" aria-label="Thread tags">${tags.map((tag) => {
+            const color = escapeHtml(colorizeThreadTag(tag, sourceParent));
+            const label = escapeHtml(tag.replace(/[\[\]]/g, ''));
+            return `<span class="threadTag" style="color:${color};"><span>[</span><span class="threadTagText">${label}</span><span>]</span></span>`;
+        }).join(' ')}</span>`;
+    }
+
+    function getSteamDbUrl(appId) {
+        return appId ? `https://steamdb.info/app/${encodeURIComponent(appId)}/` : '';
+    }
+
+    function renderMetaRow(rawAppId, topicInfo) {
+        const appId = escapeHtml(rawAppId || '');
+        const steamDbUrl = rawAppId ? escapeHtml(getSteamDbUrl(rawAppId)) : '';
+        const appIdHtml = rawAppId ?
+            `<span class="steamAppIdControl"><strong>AppID:</strong> <button type="button" class="copyAppIdBtn" data-app-id="${appId}" title="Copy Steam AppID">${appId}</button><a class="steamDbLink" href="${steamDbUrl}" target="_blank" rel="noopener noreferrer" title="Open SteamDB" aria-label="Open SteamDB for Steam AppID ${appId}">&#8599;</a></span>` :
+            '';
+        const threadTagsHtml = renderThreadTags(topicInfo.threadTags, topicInfo.tagSourceParent);
+        const rowClass = appIdHtml ? 'steamMetaRow' : 'steamMetaRow steamMetaRowTagsOnly';
+
+        return appIdHtml || threadTagsHtml ?
+            `<div class="${rowClass}">${appIdHtml}${threadTagsHtml}</div>` :
+            '';
+    }
+
     function cleanName(raw) {
         if (!raw) return null;
 
@@ -424,8 +554,10 @@
 
         const topicUrl = absoluteUrl(link.getAttribute('href'));
         const latestUrl = getLatestPageUrl(link, row);
+        const threadTags = extractThreadTags(rawTitle);
+        const tagSourceParent = link.parentElement;
 
-        return { link, row, rawTitle, gameName, topicUrl, latestUrl };
+        return { link, row, rawTitle, gameName, topicUrl, latestUrl, threadTags, tagSourceParent };
     }
 
     async function waitForRequestSlot() {
@@ -876,8 +1008,10 @@
 
     function renderNoData(gameName, topicInfo) {
         const searchUrl = `https://store.steampowered.com/search/?term=${encodeURIComponent(gameName)}`;
+        const metaRowHtml = renderMetaRow('', topicInfo);
         tip.innerHTML = `
             <p>No Steam info found for<br><strong>${escapeHtml(gameName)}</strong></p>
+            ${metaRowHtml}
             <div class="tipActions">
                 <a href="${escapeHtml(searchUrl)}" target="_blank" rel="noopener noreferrer">🎮 Open on Steam</a>
                 <a href="${escapeHtml(topicInfo.latestUrl)}" target="_blank" rel="noopener noreferrer">↗️ Open Latest Page</a>
@@ -893,7 +1027,6 @@
         const storeUrl = escapeHtml(data.storeUrl || `https://store.steampowered.com/search/?term=${encodeURIComponent(gameName)}`);
         const latestUrl = escapeHtml(topicInfo.latestUrl);
         const rawAppId = data.appId || data.steam_appid || '';
-        const appId = escapeHtml(rawAppId);
         const tagLabel = getTagSource(data) === 'steam' ? 'Tags' : 'Genres';
         const tagsHtml = data.tags?.length ?
             `<p class="steamTags"><strong>${tagLabel}:</strong> ${data.tags.map(escapeHtml).join(' • ')}</p>` :
@@ -904,15 +1037,13 @@
         const releaseDateHtml = data.releaseDate ?
             `<p class="steamReleaseDate"><strong>Released:</strong> ${releaseDate}</p>` :
             '';
-        const appIdHtml = rawAppId ?
-            `<p class="steamAppId"><strong>AppID:</strong> <button type="button" class="copyAppIdBtn" data-app-id="${appId}" title="Copy Steam AppID">${appId}</button></p>` :
-            '';
+        const metaRowHtml = renderMetaRow(rawAppId, topicInfo);
 
         tip.innerHTML = `
             ${data.header_image ? `<img src="${headerImage}" alt="${title}" onerror="this.style.display='none'">` : ''}
             <p><strong>${title}</strong></p>
             ${releaseDateHtml}
-            ${appIdHtml}
+            ${metaRowHtml}
             <p>${shortDescription}</p>
             ${reviewHtml}
             ${tagsHtml}
