@@ -1,8 +1,8 @@
 // ==UserScript==
 // @name         CS.RIN.RU - Steam Hover Preview
 // @namespace    https://greasyfork.org/en/users/1340389-deonholo
-// @version      2.2
-// @description  On-hover Steam thumbnail, description, ratings, tags, AppID, SteamDB, Open on Steam, and Open Latest Page for cs.rin.ru forum topics
+// @version      3.0
+// @description  On-hover Steam media, description, ratings, tags, AppID, SteamDB, Open on Steam, and Open Latest Page for cs.rin.ru forum topics
 // @author       DeonHolo
 // @license      MIT
 // @icon         https://raw.githubusercontent.com/SubZeroPL/cs-rin-ru-enhanced-mod/master/image.png
@@ -52,6 +52,9 @@
     let currentHoveredLink = null;
     let userHovering = false;
     let isPageHidden = document.hidden || false;
+    let currentMedia = [];
+    let currentMediaIndex = 0;
+    let currentMediaTitle = '';
 
     const apiCache = new Map();
     const inFlightFetches = new Map();
@@ -219,6 +222,104 @@
             width: 100%;
             margin-bottom: 8px;
             border-radius: 2px;
+        }
+        .csrinruSteamHoverTip .steamMediaFrame {
+            position: relative;
+            width: 100%;
+            aspect-ratio: 460 / 215;
+            margin-bottom: 8px;
+            overflow: hidden;
+            background: #111;
+            border-radius: 2px;
+        }
+        .csrinruSteamHoverTip .steamMediaViewport {
+            width: 100%;
+            height: 100%;
+            background: #111;
+        }
+        .csrinruSteamHoverTip .steamMediaImage,
+        .csrinruSteamHoverTip .steamMediaPoster,
+        .csrinruSteamHoverTip .steamMediaVideo {
+            display: block;
+            width: 100%;
+            height: 100%;
+            margin: 0;
+            border-radius: 0;
+            object-fit: cover;
+        }
+        .csrinruSteamHoverTip .steamMediaVideo {
+            background: #000;
+        }
+        .csrinruSteamHoverTip .steamMediaNavBtn {
+            position: absolute;
+            top: 50%;
+            display: grid;
+            place-items: center;
+            width: 26px;
+            height: 36px;
+            margin: 0;
+            padding: 0;
+            border: 1px solid rgba(255, 255, 255, 0.22);
+            background: rgba(0, 0, 0, 0.58);
+            color: #f2f2f2;
+            font: bold 19px/1 Arial, sans-serif;
+            cursor: pointer;
+            opacity: 0.82;
+            transform: translateY(-50%);
+        }
+        .csrinruSteamHoverTip .steamMediaNavBtn:hover,
+        .csrinruSteamHoverTip .steamMediaNavBtn:focus {
+            opacity: 1;
+            background: rgba(0, 0, 0, 0.74);
+            outline: 1px solid #99d2f7;
+        }
+        .csrinruSteamHoverTip .steamMediaPrevBtn {
+            left: 5px;
+        }
+        .csrinruSteamHoverTip .steamMediaNextBtn {
+            right: 5px;
+        }
+        .csrinruSteamHoverTip .steamMediaCounter {
+            position: absolute;
+            top: 6px;
+            right: 6px;
+            padding: 1px 5px;
+            background: rgba(0, 0, 0, 0.68);
+            border-radius: 3px;
+            color: #d6e8ee;
+            font-size: 10px;
+            line-height: 1.35;
+        }
+        .csrinruSteamHoverTip .steamMediaPlayBtn {
+            position: relative;
+            display: block;
+            width: 100%;
+            height: 100%;
+            margin: 0;
+            padding: 0;
+            border: 0;
+            background: #111;
+            cursor: pointer;
+        }
+        .csrinruSteamHoverTip .steamMediaPlayBtn:hover .steamMediaPlayIcon,
+        .csrinruSteamHoverTip .steamMediaPlayBtn:focus .steamMediaPlayIcon {
+            background: rgba(0, 0, 0, 0.78);
+            outline: 1px solid #99d2f7;
+        }
+        .csrinruSteamHoverTip .steamMediaPlayIcon {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            display: grid;
+            place-items: center;
+            width: 42px;
+            height: 42px;
+            border-radius: 50%;
+            background: rgba(0, 0, 0, 0.62);
+            color: #f2f2f2;
+            font-size: 24px;
+            line-height: 1;
+            transform: translate(-50%, -50%);
         }
         .csrinruSteamHoverTip strong {
             color: #f2f2f2;
@@ -523,6 +624,73 @@
         return appIdHtml || threadTagsHtml ?
             `<div class="${rowClass}">${appIdHtml}${threadTagsHtml}</div>` :
             '';
+    }
+
+    function isUsableUrl(value) {
+        try {
+            const url = new URL(value);
+            return url.protocol === 'http:' || url.protocol === 'https:';
+        } catch (_) {
+            return false;
+        }
+    }
+
+    function getMovieVideoUrl(movie) {
+        return movie?.mp4?.max ||
+            movie?.mp4?.['480'] ||
+            movie?.webm?.max ||
+            movie?.webm?.['480'] ||
+            '';
+    }
+
+    function normalizeSteamMedia(appData) {
+        const media = [];
+        const seen = new Set();
+        const title = appData?.name || 'Steam media';
+
+        function addMedia(item) {
+            const key = item.url || item.videoUrl || item.posterUrl;
+            if (!key || seen.has(key)) return;
+            seen.add(key);
+            media.push(item);
+        }
+
+        if (isUsableUrl(appData?.header_image)) {
+            addMedia({
+                type: 'image',
+                source: 'header',
+                url: appData.header_image,
+                alt: `${title} Steam header image`
+            });
+        }
+
+        (appData?.screenshots || []).forEach((screenshot, index) => {
+            const url = screenshot?.path_thumbnail || screenshot?.path_full || '';
+            if (!isUsableUrl(url)) return;
+
+            addMedia({
+                type: 'image',
+                source: 'screenshot',
+                url,
+                alt: `${title} screenshot ${index + 1}`
+            });
+        });
+
+        (appData?.movies || []).forEach((movie, index) => {
+            const posterUrl = movie?.thumbnail || '';
+            const videoUrl = getMovieVideoUrl(movie);
+            if (!isUsableUrl(posterUrl) || !isUsableUrl(videoUrl)) return;
+
+            addMedia({
+                type: 'video',
+                source: 'movie',
+                posterUrl,
+                videoUrl,
+                alt: movie?.name || `${title} video ${index + 1}`
+            });
+        });
+
+        return media;
     }
 
     function cleanName(raw) {
@@ -907,10 +1075,12 @@
         }
 
         const tags = getGenreTags(appData);
+        const media = normalizeSteamMedia(appData);
 
         const data = {
             ...appData,
             appId,
+            media,
             tags,
             tagsSource: 'genres',
             reviewInfo,
@@ -951,6 +1121,94 @@
         return stars ? `<span class="ratingStars">${stars}</span>` : '';
     }
 
+    function stopActiveVideo() {
+        tip.querySelectorAll('.steamMediaVideo').forEach((video) => {
+            try {
+                video.pause();
+                video.removeAttribute('src');
+                video.load();
+            } catch (_) {
+                // Ignore cleanup failures from browser media internals.
+            }
+        });
+    }
+
+    function resetMediaState() {
+        stopActiveVideo();
+        currentMedia = [];
+        currentMediaIndex = 0;
+        currentMediaTitle = '';
+    }
+
+    function getRenderMedia(data) {
+        if (data?.media?.length) return data.media;
+        return normalizeSteamMedia(data);
+    }
+
+    function renderMediaItem(item, index, title) {
+        if (!item) return '';
+
+        const label = escapeHtml(item.alt || title || 'Steam media');
+        if (item.type === 'video') {
+            return `
+                <button type="button" class="steamMediaPlayBtn" data-media-index="${index}" aria-label="Play ${label}" title="Play video">
+                    <img class="steamMediaPoster" src="${escapeHtml(item.posterUrl)}" alt="${label}" loading="lazy" onerror="this.style.display='none'">
+                    <span class="steamMediaPlayIcon" aria-hidden="true">&#9658;</span>
+                </button>
+            `;
+        }
+
+        return `<img class="steamMediaImage" src="${escapeHtml(item.url)}" alt="${label}" loading="lazy" onerror="this.style.display='none'">`;
+    }
+
+    function renderMediaCarousel(media, title) {
+        if (!media?.length) return '';
+
+        const hasMultiple = media.length > 1;
+        const controlsHtml = hasMultiple ? `
+            <button type="button" class="steamMediaNavBtn steamMediaPrevBtn" aria-label="Previous Steam media" title="Previous media">&#8249;</button>
+            <button type="button" class="steamMediaNavBtn steamMediaNextBtn" aria-label="Next Steam media" title="Next media">&#8250;</button>
+            <span class="steamMediaCounter" aria-live="polite">1 / ${escapeHtml(media.length)}</span>
+        ` : '';
+
+        return `
+            <div class="steamMediaFrame" aria-label="Steam media preview">
+                <div class="steamMediaViewport">${renderMediaItem(media[0], 0, title)}</div>
+                ${controlsHtml}
+            </div>
+        `;
+    }
+
+    function setActiveMedia(index) {
+        if (!currentMedia.length) return;
+
+        stopActiveVideo();
+        currentMediaIndex = (index + currentMedia.length) % currentMedia.length;
+
+        const viewport = tip.querySelector('.steamMediaViewport');
+        if (viewport) {
+            viewport.innerHTML = renderMediaItem(currentMedia[currentMediaIndex], currentMediaIndex, currentMediaTitle);
+        }
+
+        const counter = tip.querySelector('.steamMediaCounter');
+        if (counter) {
+            counter.textContent = `${currentMediaIndex + 1} / ${currentMedia.length}`;
+        }
+    }
+
+    function playActiveVideo() {
+        const item = currentMedia[currentMediaIndex];
+        if (!item || item.type !== 'video' || !isUsableUrl(item.videoUrl)) return;
+
+        const label = escapeHtml(item.alt || currentMediaTitle || 'Steam video');
+        const poster = isUsableUrl(item.posterUrl) ? ` poster="${escapeHtml(item.posterUrl)}"` : '';
+        const viewport = tip.querySelector('.steamMediaViewport');
+        if (!viewport) return;
+
+        stopActiveVideo();
+        viewport.innerHTML = `<video class="steamMediaVideo" src="${escapeHtml(item.videoUrl)}"${poster} controls autoplay playsinline aria-label="${label}"></video>`;
+    }
+
     function positionTip(ev) {
         let x = ev.pageX + 15;
         let y = ev.pageY + 15;
@@ -976,6 +1234,7 @@
 
     function startHideAnimation() {
         if (tip.style.display !== 'none') {
+            resetMediaState();
             tip.style.opacity = '0';
             tip.style.pointerEvents = 'none';
             trackingMove = false;
@@ -1006,6 +1265,7 @@
     }
 
     function renderLoading(event, gameName) {
+        resetMediaState();
         tip.innerHTML = `<div class="loadingContainer"><div class="spinner"></div><span>Loading <strong>${escapeHtml(gameName)}</strong>…</span></div>`;
         positionTip(event);
         tip.style.display = 'block';
@@ -1015,6 +1275,7 @@
     }
 
     function renderNoData(gameName, topicInfo) {
+        resetMediaState();
         const searchUrl = `https://store.steampowered.com/search/?term=${encodeURIComponent(gameName)}`;
         const metaRowHtml = renderMetaRow('', topicInfo);
         tip.innerHTML = `
@@ -1029,7 +1290,6 @@
 
     function renderSteamData(data, gameName, topicInfo) {
         const title = escapeHtml(data.name || gameName);
-        const headerImage = escapeHtml(data.header_image || '');
         const shortDescription = escapeHtml(data.short_description || 'No description available.');
         const releaseDate = escapeHtml(data.releaseDate || '');
         const storeUrl = escapeHtml(data.storeUrl || `https://store.steampowered.com/search/?term=${encodeURIComponent(gameName)}`);
@@ -1046,9 +1306,16 @@
             `<p class="steamReleaseDate"><strong>Released:</strong> ${releaseDate}</p>` :
             '';
         const metaRowHtml = renderMetaRow(rawAppId, topicInfo);
+        const media = getRenderMedia(data);
+        const mediaHtml = renderMediaCarousel(media, data.name || gameName);
+
+        stopActiveVideo();
+        currentMedia = media;
+        currentMediaIndex = 0;
+        currentMediaTitle = data.name || gameName;
 
         tip.innerHTML = `
-            ${data.header_image ? `<img src="${headerImage}" alt="${title}" onerror="this.style.display='none'">` : ''}
+            ${mediaHtml}
             <p><strong>${title}</strong></p>
             ${releaseDateHtml}
             ${metaRowHtml}
@@ -1070,6 +1337,34 @@
     tip.addEventListener('mouseleave', scheduleHideTip);
 
     tip.addEventListener('click', async (e) => {
+        const prevButton = e.target.closest('.steamMediaPrevBtn');
+        if (prevButton) {
+            e.preventDefault();
+            e.stopPropagation();
+            setActiveMedia(currentMediaIndex - 1);
+            return;
+        }
+
+        const nextButton = e.target.closest('.steamMediaNextBtn');
+        if (nextButton) {
+            e.preventDefault();
+            e.stopPropagation();
+            setActiveMedia(currentMediaIndex + 1);
+            return;
+        }
+
+        const playButton = e.target.closest('.steamMediaPlayBtn');
+        if (playButton) {
+            e.preventDefault();
+            e.stopPropagation();
+            const index = parseInt(playButton.dataset.mediaIndex, 10);
+            if (!isNaN(index) && index !== currentMediaIndex) {
+                setActiveMedia(index);
+            }
+            playActiveVideo();
+            return;
+        }
+
         const appIdButton = e.target.closest('.copyAppIdBtn');
         if (!appIdButton) return;
 
@@ -1101,6 +1396,7 @@
         if (!topicInfo) return;
 
         if (currentHoveredLink && targetLink !== currentHoveredLink && tip.style.display === 'block') {
+            resetMediaState();
             tip.style.opacity = '0';
             tip.style.pointerEvents = 'none';
             tip.style.display = 'none';

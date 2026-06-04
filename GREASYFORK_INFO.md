@@ -18,7 +18,11 @@
 <ul>
     <li>
         <strong>Instant Hover Preview</strong><br>
-        Displays the official Steam header image, date released, and short game description when you hover over a topic title.
+        Displays Steam media, date released, and short game description when you hover over a topic title.
+    </li>
+    <li>
+        <strong>Steam Media Carousel</strong><br>
+        Starts with the official Steam header image, then lets you browse screenshots and click-to-play videos when available.
     </li>
     <li>
         <strong>See Steam Ratings</strong><br>
@@ -50,7 +54,7 @@
     </li>
     <li>
         <strong>Snappy & Lightweight</strong><br>
-        Previews are cached and preloaded for smooth browsing without constantly bothering Steam.
+        Previews are cached and preloaded for smooth browsing without constantly bothering Steam, including media metadata when available.
     </li>
 </ul>
 

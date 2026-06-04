@@ -61,7 +61,7 @@ Use an overlay-control carousel inside the existing top media area:
 
 - The media frame keeps a fixed aspect ratio matching Steam header art.
 - Left and right controls sit over the media edges.
-- A small counter sits in a bottom corner, such as `1 / 7`.
+- A small counter sits in the top-right corner, such as `1 / 7`, so it does not collide with native video controls.
 - Video items show a centered play affordance over the poster.
 - Clicking the poster/play affordance loads and plays the video.
 - Clicking carousel arrows never opens Steam and never hides the tooltip.

@@ -12,7 +12,7 @@ A userscript that displays Steam game information when hovering over game topic 
 
 ## Features
 
-- **🖼️ Game Thumbnail** - Steam header image displayed in tooltip
+- **🖼️ Steam Media Carousel** - Steam header image first, with screenshots and click-to-play videos when available
 - **📝 Description** - Short game description from Steam
 - **⭐ Steam Ratings** - Visual star rating with review summary and count
 - **🏷️ User-Defined Tags** - Actual Steam community tags (Survival Horror, RPG, etc.)
@@ -23,7 +23,7 @@ A userscript that displays Steam game information when hovering over game topic 
 - **↗️ Open Latest Page** - Opens the latest page of the CS.RIN.RU topic, where new links and updates are usually posted
 - **🧹 Topic Cleanup** - Cleans forum title tags like `[Info]`, `[CRACKED]`, `[NOT CRACKED]`, build/update labels, and platform notes before searching Steam
 - **🎯 Base Game Matching** - Prefers base-game Steam results over DLC, upgrades, season passes, and store extras
-- **⚡ Smart Caching** - Persistent cache across sessions (24hr TTL) and short failed-lookup cache (15min TTL)
+- **⚡ Smart Caching** - Persistent cache across sessions (24hr TTL), including media metadata, and short failed-lookup cache (15min TTL)
 - **🔄 Background Preloading** - Preloads game data when the tab is idle
 
 ## Installation
@@ -49,7 +49,7 @@ The script works on CS.RIN.RU forum pages:
 2. Hover over a game topic title in the `Topics` section
 3. The script extracts and cleans the game name from the topic title
 4. Searches Steam for a matching base game
-5. Displays a tooltip with Steam information
+5. Displays a tooltip with Steam information and browsable media when available
 6. Copy the AppID, open SteamDB, or use `🎮 Open on Steam` / `↗️ Open Latest Page` from the hover preview
 
 ## Technical Details
