@@ -14,6 +14,7 @@
 // @grant        GM_addStyle
 // @grant        GM_getValue
 // @grant        GM_setValue
+// @require      https://cdn.jsdelivr.net/npm/hls.js@1.5.20/dist/hls.min.js
 // @connect      store.steampowered.com
 // @run-at       document-idle
 // ==/UserScript==
@@ -40,6 +41,11 @@
 
     const tip = document.createElement('div');
     tip.className = 'csrinruSteamHoverTip';
+    const theatre = document.createElement('div');
+    theatre.className = 'csrinruSteamTheatre';
+    theatre.setAttribute('role', 'dialog');
+    theatre.setAttribute('aria-modal', 'true');
+    theatre.setAttribute('aria-hidden', 'true');
 
     let lastRequest = 0;
     let requestGate = Promise.resolve();
@@ -55,6 +61,12 @@
     let currentMedia = [];
     let currentMediaIndex = 0;
     let currentMediaTitle = '';
+    let activeHls = null;
+    let theatreMedia = [];
+    let theatreMediaIndex = 0;
+    let theatreMediaTitle = '';
+    let theatreActiveHls = null;
+    let previousDocumentOverflow = '';
 
     const apiCache = new Map();
     const inFlightFetches = new Map();
@@ -195,7 +207,7 @@
             position: absolute;
             display: none;
             opacity: 0;
-            max-width: 320px;
+            max-width: 420px;
             padding: 8px;
             background: rgba(28, 28, 28, 0.98);
             border: 1px solid #5c5c5c;
@@ -223,11 +235,13 @@
             margin-bottom: 8px;
             border-radius: 2px;
         }
+        .csrinruSteamHoverTip .steamMediaShell {
+            margin-bottom: 8px;
+        }
         .csrinruSteamHoverTip .steamMediaFrame {
             position: relative;
             width: 100%;
             aspect-ratio: 460 / 215;
-            margin-bottom: 8px;
             overflow: hidden;
             background: #111;
             border-radius: 2px;
@@ -250,6 +264,18 @@
         .csrinruSteamHoverTip .steamMediaVideo {
             background: #000;
         }
+        .csrinruSteamHoverTip .steamMediaError {
+            display: grid;
+            place-items: center;
+            width: 100%;
+            height: 100%;
+            padding: 12px;
+            background: #151515;
+            color: #d6e8ee;
+            font-size: 12px;
+            text-align: center;
+            box-sizing: border-box;
+        }
         .csrinruSteamHoverTip .steamMediaNavBtn {
             position: absolute;
             top: 50%;
@@ -265,6 +291,7 @@
             font: bold 19px/1 Arial, sans-serif;
             cursor: pointer;
             opacity: 0.82;
+            touch-action: manipulation;
             transform: translateY(-50%);
         }
         .csrinruSteamHoverTip .steamMediaNavBtn:hover,
@@ -300,6 +327,7 @@
             border: 0;
             background: #111;
             cursor: pointer;
+            touch-action: manipulation;
         }
         .csrinruSteamHoverTip .steamMediaPlayBtn:hover .steamMediaPlayIcon,
         .csrinruSteamHoverTip .steamMediaPlayBtn:focus .steamMediaPlayIcon {
@@ -320,6 +348,80 @@
             font-size: 24px;
             line-height: 1;
             transform: translate(-50%, -50%);
+        }
+        .csrinruSteamHoverTip .steamMediaThumbStrip {
+            display: flex;
+            gap: 3px;
+            margin-top: 4px;
+            overflow-x: auto;
+            scrollbar-width: thin;
+            scrollbar-color: #40566a #151515;
+        }
+        .csrinruSteamHoverTip .steamMediaThumbStrip::-webkit-scrollbar {
+            height: 6px;
+        }
+        .csrinruSteamHoverTip .steamMediaThumbStrip::-webkit-scrollbar-track {
+            background: #151515;
+        }
+        .csrinruSteamHoverTip .steamMediaThumbStrip::-webkit-scrollbar-thumb {
+            background: #40566a;
+            border-radius: 999px;
+        }
+        .csrinruSteamHoverTip .steamMediaThumbBtn {
+            position: relative;
+            flex: 0 0 52px;
+            width: 52px;
+            height: 32px;
+            margin: 0;
+            padding: 0;
+            overflow: hidden;
+            background: #111;
+            border: 1px solid #333;
+            border-radius: 2px;
+            cursor: pointer;
+            opacity: 0.74;
+            touch-action: manipulation;
+        }
+        .csrinruSteamHoverTip .steamMediaThumbStripFit {
+            overflow-x: hidden;
+        }
+        .csrinruSteamHoverTip .steamMediaThumbStripFit .steamMediaThumbBtn {
+            flex: 1 1 0;
+            width: auto;
+            min-width: 0;
+        }
+        .csrinruSteamHoverTip .steamMediaThumbBtn:hover,
+        .csrinruSteamHoverTip .steamMediaThumbBtn:focus {
+            opacity: 1;
+            border-color: #99d2f7;
+            outline: 1px solid rgba(153, 210, 247, 0.62);
+        }
+        .csrinruSteamHoverTip .steamMediaThumbActive {
+            opacity: 1;
+            border-color: #99d2f7;
+            box-shadow: 0 0 0 1px rgba(153, 210, 247, 0.45);
+        }
+        .csrinruSteamHoverTip .steamMediaThumbImage {
+            display: block;
+            width: 100%;
+            height: 100%;
+            margin: 0;
+            border-radius: 0;
+            object-fit: cover;
+        }
+        .csrinruSteamHoverTip .steamMediaThumbPlayIcon {
+            position: absolute;
+            right: 3px;
+            bottom: 3px;
+            display: grid;
+            place-items: center;
+            width: 16px;
+            height: 16px;
+            border-radius: 50%;
+            background: rgba(0, 0, 0, 0.72);
+            color: #f2f2f2;
+            font-size: 10px;
+            line-height: 1;
         }
         .csrinruSteamHoverTip strong {
             color: #f2f2f2;
@@ -393,6 +495,7 @@
             display: flex;
             justify-content: flex-end;
             flex-wrap: nowrap;
+            flex: 1 1 auto;
             gap: 0 4px;
             margin-left: auto;
             min-width: 0;
@@ -406,11 +509,13 @@
             white-space: nowrap;
             overflow: hidden;
             text-overflow: ellipsis;
+            flex: 0 1 auto;
+            font-weight: bold;
             min-width: 0;
-            max-width: 170px;
+            max-width: 100%;
         }
         .csrinruSteamHoverTip .threadTagText {
-            font-size: 0.9em;
+            font-size: 1em;
         }
         .csrinruSteamHoverTip .ratingStars {
             color: #f5c518;
@@ -449,10 +554,266 @@
             padding-top: 2px;
             border-top: none;
         }
+        .csrinruSteamHoverTip .steamMediaExpandBtn {
+            position: absolute;
+            top: 6px;
+            left: 6px;
+            display: grid;
+            place-items: center;
+            width: 24px;
+            height: 24px;
+            margin: 0;
+            padding: 0;
+            border: 1px solid rgba(255, 255, 255, 0.22);
+            background: rgba(0, 0, 0, 0.58);
+            color: #f2f2f2;
+            font: bold 16px/1 Arial, sans-serif;
+            cursor: pointer;
+            opacity: 0.82;
+            touch-action: manipulation;
+        }
+        .csrinruSteamHoverTip .steamMediaExpandBtn:hover,
+        .csrinruSteamHoverTip .steamMediaExpandBtn:focus {
+            opacity: 1;
+            background: rgba(0, 0, 0, 0.74);
+            outline: 1px solid #99d2f7;
+        }
+        .csrinruSteamTheatre {
+            position: fixed;
+            inset: 0;
+            display: none;
+            grid-template-rows: 34px minmax(0, 1fr) auto;
+            background: rgba(0, 0, 0, 0.88);
+            color: #c7d5e0;
+            font: 12px/1.45 Arial, Helvetica, sans-serif;
+            z-index: 2147483647;
+        }
+        .csrinruSteamTheatreOpen {
+            display: grid;
+        }
+        .csrinruSteamTheatreHeader {
+            position: relative;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            min-width: 0;
+            padding: 0 96px;
+            background: #20262e;
+            box-sizing: border-box;
+        }
+        .csrinruSteamTheatreTitle {
+            overflow: hidden;
+            color: #b8c6d4;
+            font-size: 13px;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+        .csrinruSteamTheatreHeaderControls {
+            position: absolute;
+            top: 5px;
+            right: 8px;
+            display: flex;
+            gap: 6px;
+        }
+        .csrinruSteamTheatreBtn,
+        .csrinruSteamTheatreNavBtn,
+        .csrinruSteamTheatrePlayBtn {
+            margin: 0;
+            border: 0;
+            color: #f2f2f2;
+            cursor: pointer;
+            touch-action: manipulation;
+        }
+        .csrinruSteamTheatreBtn {
+            display: grid;
+            place-items: center;
+            width: 24px;
+            height: 24px;
+            padding: 0;
+            background: transparent;
+            font: bold 21px/1 Arial, sans-serif;
+            opacity: 0.82;
+        }
+        .csrinruSteamTheatreBtn:hover,
+        .csrinruSteamTheatreBtn:focus {
+            opacity: 1;
+            outline: 1px solid #99d2f7;
+        }
+        .csrinruSteamTheatreStage {
+            position: relative;
+            min-width: 0;
+            min-height: 0;
+            overflow: hidden;
+            background: #050505;
+        }
+        .csrinruSteamTheatreViewport {
+            display: grid;
+            place-items: center;
+            width: 100%;
+            height: 100%;
+        }
+        .csrinruSteamTheatreImage,
+        .csrinruSteamTheatrePoster,
+        .csrinruSteamTheatreVideo {
+            display: block;
+            width: 100%;
+            height: 100%;
+            max-width: 100%;
+            max-height: 100%;
+            margin: 0;
+            object-fit: contain;
+            background: #000;
+        }
+        .csrinruSteamTheatrePlayBtn {
+            position: relative;
+            display: block;
+            width: 100%;
+            height: 100%;
+            padding: 0;
+            background: #050505;
+        }
+        .csrinruSteamTheatrePlayIcon {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            display: grid;
+            place-items: center;
+            width: 64px;
+            height: 64px;
+            border-radius: 50%;
+            background: rgba(0, 0, 0, 0.62);
+            color: #f2f2f2;
+            font-size: 34px;
+            line-height: 1;
+            transform: translate(-50%, -50%);
+        }
+        .csrinruSteamTheatrePlayBtn:hover .csrinruSteamTheatrePlayIcon,
+        .csrinruSteamTheatrePlayBtn:focus .csrinruSteamTheatrePlayIcon {
+            background: rgba(0, 0, 0, 0.78);
+            outline: 1px solid #99d2f7;
+        }
+        .csrinruSteamTheatreNavBtn {
+            position: absolute;
+            top: 50%;
+            display: grid;
+            place-items: center;
+            width: 48px;
+            height: 72px;
+            padding: 0;
+            background: rgba(0, 0, 0, 0.26);
+            font: bold 52px/1 Arial, sans-serif;
+            opacity: 0.62;
+            transform: translateY(-50%);
+        }
+        .csrinruSteamTheatreNavBtn:hover,
+        .csrinruSteamTheatreNavBtn:focus {
+            opacity: 1;
+            background: rgba(0, 0, 0, 0.42);
+            outline: 1px solid #99d2f7;
+        }
+        .csrinruSteamTheatrePrevBtn {
+            left: 0;
+        }
+        .csrinruSteamTheatreNextBtn {
+            right: 0;
+        }
+        .csrinruSteamTheatreFooter {
+            display: grid;
+            gap: 8px;
+            padding: 8px 18px 12px;
+            background: #20262e;
+            box-sizing: border-box;
+        }
+        .csrinruSteamTheatreCounter {
+            color: #9fb0bf;
+            font-size: 12px;
+            text-align: center;
+        }
+        .csrinruSteamTheatreThumbStrip {
+            display: flex;
+            gap: 4px;
+            width: 100%;
+            max-width: 980px;
+            margin: 0 auto;
+            overflow-x: auto;
+            scrollbar-width: thin;
+            scrollbar-color: #40566a #151515;
+        }
+        .csrinruSteamTheatreThumbStripFit {
+            overflow-x: hidden;
+        }
+        .csrinruSteamTheatreThumbStrip::-webkit-scrollbar {
+            height: 7px;
+        }
+        .csrinruSteamTheatreThumbStrip::-webkit-scrollbar-track {
+            background: #151515;
+        }
+        .csrinruSteamTheatreThumbStrip::-webkit-scrollbar-thumb {
+            background: #40566a;
+            border-radius: 999px;
+        }
+        .csrinruSteamTheatreThumbBtn {
+            position: relative;
+            flex: 0 0 74px;
+            width: 74px;
+            height: 42px;
+            margin: 0;
+            padding: 0;
+            overflow: hidden;
+            background: #111;
+            border: 1px solid #333;
+            border-radius: 2px;
+            cursor: pointer;
+            opacity: 0.72;
+            touch-action: manipulation;
+        }
+        .csrinruSteamTheatreThumbStripFit .csrinruSteamTheatreThumbBtn {
+            flex: 1 1 0;
+            width: auto;
+            min-width: 0;
+        }
+        .csrinruSteamTheatreThumbBtn:hover,
+        .csrinruSteamTheatreThumbBtn:focus,
+        .csrinruSteamTheatreThumbActive {
+            opacity: 1;
+            border-color: #99d2f7;
+            outline: 1px solid rgba(153, 210, 247, 0.62);
+        }
+        .csrinruSteamTheatreThumbImage {
+            display: block;
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+        }
+        .csrinruSteamTheatreThumbPlayIcon {
+            position: absolute;
+            right: 4px;
+            bottom: 4px;
+            display: grid;
+            place-items: center;
+            width: 18px;
+            height: 18px;
+            border-radius: 50%;
+            background: rgba(0, 0, 0, 0.72);
+            color: #f2f2f2;
+            font-size: 11px;
+            line-height: 1;
+        }
+        .csrinruSteamTheatreError {
+            display: grid;
+            place-items: center;
+            width: 100%;
+            height: 100%;
+            padding: 24px;
+            color: #d6e8ee;
+            text-align: center;
+            box-sizing: border-box;
+        }
     `);
 
     loadPersistentCache();
     document.body.appendChild(tip);
+    document.body.appendChild(theatre);
 
     document.addEventListener('visibilitychange', () => {
         isPageHidden = document.hidden;
@@ -635,12 +996,46 @@
         }
     }
 
-    function getMovieVideoUrl(movie) {
-        return movie?.mp4?.max ||
-            movie?.mp4?.['480'] ||
-            movie?.webm?.max ||
-            movie?.webm?.['480'] ||
-            '';
+    function getUsableMediaUrl(value) {
+        try {
+            const url = new URL(value);
+            if (url.protocol !== 'http:' && url.protocol !== 'https:') return '';
+            if (url.protocol === 'http:' && /(^|\.)steamstatic\.com$|(^|\.)akamai\.steamstatic\.com$|(^|\.)akamaihd\.net$/.test(url.hostname)) {
+                url.protocol = 'https:';
+            }
+            return url.href;
+        } catch (_) {
+            return '';
+        }
+    }
+
+    function getPreferredVideoUrl(source) {
+        if (!source) return '';
+        if (typeof source === 'string') return getUsableMediaUrl(source);
+
+        for (const key of ['max', '720', '720p', '480', '480p']) {
+            const url = getUsableMediaUrl(source[key]);
+            if (url) return url;
+        }
+
+        return Object.values(source)
+            .map(getUsableMediaUrl)
+            .find(Boolean) || '';
+    }
+
+    function getMovieSources(movie) {
+        const videoUrl = getPreferredVideoUrl(movie?.mp4) ||
+            getPreferredVideoUrl(movie?.webm) ||
+            getUsableMediaUrl(movie?.video_url);
+
+        const hlsUrl = getUsableMediaUrl(movie?.hls_h264) ||
+            getUsableMediaUrl(movie?.hlsManifest) ||
+            getUsableMediaUrl(movie?.hls);
+
+        const dashUrl = getUsableMediaUrl(movie?.dash_h264) ||
+            getUsableMediaUrl(movie?.dash_av1);
+
+        return { videoUrl, hlsUrl, dashUrl };
     }
 
     function normalizeSteamMedia(appData) {
@@ -664,33 +1059,56 @@
             });
         }
 
-        (appData?.screenshots || []).forEach((screenshot, index) => {
-            const url = screenshot?.path_thumbnail || screenshot?.path_full || '';
-            if (!isUsableUrl(url)) return;
-
-            addMedia({
-                type: 'image',
-                source: 'screenshot',
-                url,
-                alt: `${title} screenshot ${index + 1}`
-            });
-        });
-
         (appData?.movies || []).forEach((movie, index) => {
-            const posterUrl = movie?.thumbnail || '';
-            const videoUrl = getMovieVideoUrl(movie);
-            if (!isUsableUrl(posterUrl) || !isUsableUrl(videoUrl)) return;
+            const posterUrl = getUsableMediaUrl(movie?.thumbnail);
+            const { videoUrl, hlsUrl, dashUrl } = getMovieSources(movie);
+            if (!isUsableUrl(posterUrl) || (!isUsableUrl(videoUrl) && !isUsableUrl(hlsUrl))) return;
 
             addMedia({
                 type: 'video',
                 source: 'movie',
                 posterUrl,
                 videoUrl,
+                hlsUrl,
+                dashUrl,
                 alt: movie?.name || `${title} video ${index + 1}`
             });
         });
 
+        (appData?.screenshots || []).forEach((screenshot, index) => {
+            const url = getUsableMediaUrl(screenshot?.path_full) || getUsableMediaUrl(screenshot?.path_thumbnail);
+            const thumbUrl = getUsableMediaUrl(screenshot?.path_thumbnail) || url;
+            if (!isUsableUrl(url)) return;
+
+            addMedia({
+                type: 'image',
+                source: 'screenshot',
+                url,
+                thumbUrl,
+                alt: `${title} screenshot ${index + 1}`
+            });
+        });
+
         return media;
+    }
+
+    function getMediaSortRank(item) {
+        if (item?.source === 'header') return 0;
+        if (item?.type === 'video' || item?.source === 'movie') return 1;
+        if (item?.source === 'screenshot') return 2;
+        return 3;
+    }
+
+    function orderSteamMediaItems(media) {
+        if (!Array.isArray(media)) return [];
+
+        return media
+            .map((item, index) => ({ item, index }))
+            .sort((a, b) => {
+                const rankDiff = getMediaSortRank(a.item) - getMediaSortRank(b.item);
+                return rankDiff || a.index - b.index;
+            })
+            .map(({ item }) => item);
     }
 
     function cleanName(raw) {
@@ -1122,7 +1540,43 @@
     }
 
     function stopActiveVideo() {
+        if (activeHls) {
+            try {
+                activeHls.destroy();
+            } catch (_) {
+                // Ignore cleanup failures from HLS internals.
+            }
+            activeHls = null;
+        }
+
         tip.querySelectorAll('.steamMediaVideo').forEach((video) => {
+            try {
+                video.pause();
+                video.removeAttribute('src');
+                video.load();
+            } catch (_) {
+                // Ignore cleanup failures from browser media internals.
+            }
+        });
+    }
+
+    function getHlsConstructor() {
+        if (typeof Hls !== 'undefined') return Hls;
+        if (typeof window.Hls !== 'undefined') return window.Hls;
+        return null;
+    }
+
+    function stopTheatreVideo() {
+        if (theatreActiveHls) {
+            try {
+                theatreActiveHls.destroy();
+            } catch (_) {
+                // Ignore cleanup failures from HLS internals.
+            }
+            theatreActiveHls = null;
+        }
+
+        theatre.querySelectorAll('.csrinruSteamTheatreVideo').forEach((video) => {
             try {
                 video.pause();
                 video.removeAttribute('src');
@@ -1141,8 +1595,9 @@
     }
 
     function getRenderMedia(data) {
-        if (data?.media?.length) return data.media;
-        return normalizeSteamMedia(data);
+        const normalizedMedia = normalizeSteamMedia(data);
+        const media = normalizedMedia.length ? normalizedMedia : (data?.media || []);
+        return orderSteamMediaItems(media);
     }
 
     function renderMediaItem(item, index, title) {
@@ -1161,6 +1616,37 @@
         return `<img class="steamMediaImage" src="${escapeHtml(item.url)}" alt="${label}" loading="lazy" onerror="this.style.display='none'">`;
     }
 
+    function getMediaThumbUrl(item) {
+        if (!item) return '';
+        return item.type === 'video' ? item.posterUrl : (item.thumbUrl || item.url);
+    }
+
+    function renderMediaThumbs(media, activeIndex, title) {
+        if (!media?.length || media.length <= 1) return '';
+
+        const thumbsHtml = media.map((item, index) => {
+            const thumbUrl = getMediaThumbUrl(item);
+            if (!isUsableUrl(thumbUrl)) return '';
+
+            const label = escapeHtml(item.alt || title || `Steam media ${index + 1}`);
+            const activeClass = index === activeIndex ? ' steamMediaThumbActive' : '';
+            const current = index === activeIndex ? 'true' : 'false';
+            const videoIcon = item.type === 'video' ?
+                '<span class="steamMediaThumbPlayIcon" aria-hidden="true">&#9658;</span>' :
+                '';
+
+            return `
+                <button type="button" class="steamMediaThumbBtn${activeClass}" data-media-index="${index}" aria-label="Show ${label}" aria-current="${current}" title="${label}">
+                    <img class="steamMediaThumbImage" src="${escapeHtml(thumbUrl)}" alt="" loading="lazy" onerror="this.style.display='none'">
+                    ${videoIcon}
+                </button>
+            `;
+        }).join('');
+
+        const fitClass = media.length <= 7 ? ' steamMediaThumbStripFit' : '';
+        return `<div class="steamMediaThumbStrip${fitClass}" aria-label="Steam media thumbnails">${thumbsHtml}</div>`;
+    }
+
     function renderMediaCarousel(media, title) {
         if (!media?.length) return '';
 
@@ -1172,11 +1658,258 @@
         ` : '';
 
         return `
-            <div class="steamMediaFrame" aria-label="Steam media preview">
-                <div class="steamMediaViewport">${renderMediaItem(media[0], 0, title)}</div>
-                ${controlsHtml}
+            <div class="steamMediaShell">
+                <div class="steamMediaFrame" aria-label="Steam media preview">
+                    <div class="steamMediaViewport">${renderMediaItem(media[0], 0, title)}</div>
+                    <button type="button" class="steamMediaExpandBtn" aria-label="Open media theatre" title="Open theatre mode">&#9974;</button>
+                    ${controlsHtml}
+                </div>
+                ${renderMediaThumbs(media, 0, title)}
             </div>
         `;
+    }
+
+    function renderTheatreMediaItem(item, index, title) {
+        if (!item) return '';
+
+        const label = escapeHtml(item.alt || title || 'Steam media');
+        if (item.type === 'video') {
+            return `
+                <button type="button" class="csrinruSteamTheatrePlayBtn" data-theatre-media-index="${index}" aria-label="Play ${label}" title="Play video">
+                    <img class="csrinruSteamTheatrePoster" src="${escapeHtml(item.posterUrl)}" alt="${label}" loading="lazy" onerror="this.style.display='none'">
+                    <span class="csrinruSteamTheatrePlayIcon" aria-hidden="true">&#9658;</span>
+                </button>
+            `;
+        }
+
+        return `<img class="csrinruSteamTheatreImage" src="${escapeHtml(item.url)}" alt="${label}" loading="lazy" onerror="this.style.display='none'">`;
+    }
+
+    function renderTheatreThumbs(media, activeIndex, title) {
+        if (!media?.length || media.length <= 1) return '';
+
+        const fitClass = media.length <= 8 ? ' csrinruSteamTheatreThumbStripFit' : '';
+        const thumbsHtml = media.map((item, index) => {
+            const thumbUrl = getMediaThumbUrl(item);
+            if (!isUsableUrl(thumbUrl)) return '';
+
+            const label = escapeHtml(item.alt || title || `Steam media ${index + 1}`);
+            const activeClass = index === activeIndex ? ' csrinruSteamTheatreThumbActive' : '';
+            const current = index === activeIndex ? 'true' : 'false';
+            const videoIcon = item.type === 'video' ?
+                '<span class="csrinruSteamTheatreThumbPlayIcon" aria-hidden="true">&#9658;</span>' :
+                '';
+
+            return `
+                <button type="button" class="csrinruSteamTheatreThumbBtn${activeClass}" data-theatre-media-index="${index}" aria-label="Show ${label}" aria-current="${current}" title="${label}">
+                    <img class="csrinruSteamTheatreThumbImage" src="${escapeHtml(thumbUrl)}" alt="" loading="lazy" onerror="this.style.display='none'">
+                    ${videoIcon}
+                </button>
+            `;
+        }).join('');
+
+        return `<div class="csrinruSteamTheatreThumbStrip${fitClass}" aria-label="Steam media thumbnails">${thumbsHtml}</div>`;
+    }
+
+    function renderTheatre() {
+        if (!theatreMedia.length) return;
+
+        const hasMultiple = theatreMedia.length > 1;
+        const navHtml = hasMultiple ? `
+            <button type="button" class="csrinruSteamTheatreNavBtn csrinruSteamTheatrePrevBtn" aria-label="Previous Steam media" title="Previous media">&#8249;</button>
+            <button type="button" class="csrinruSteamTheatreNavBtn csrinruSteamTheatreNextBtn" aria-label="Next Steam media" title="Next media">&#8250;</button>
+        ` : '';
+        const fullscreenLabel = document.fullscreenElement === theatre ? 'Exit fullscreen' : 'Enter fullscreen';
+
+        theatre.innerHTML = `
+            <div class="csrinruSteamTheatreHeader">
+                <div class="csrinruSteamTheatreTitle">${escapeHtml(theatreMediaTitle)} - Trailers &amp; Screenshots</div>
+                <div class="csrinruSteamTheatreHeaderControls">
+                    <button type="button" class="csrinruSteamTheatreBtn csrinruSteamTheatreFullscreenBtn" aria-label="${fullscreenLabel}" title="${fullscreenLabel}">&#9974;</button>
+                    <button type="button" class="csrinruSteamTheatreBtn csrinruSteamTheatreCloseBtn" aria-label="Close theatre" title="Close">&times;</button>
+                </div>
+            </div>
+            <div class="csrinruSteamTheatreStage">
+                <div class="csrinruSteamTheatreViewport">${renderTheatreMediaItem(theatreMedia[theatreMediaIndex], theatreMediaIndex, theatreMediaTitle)}</div>
+                ${navHtml}
+            </div>
+            <div class="csrinruSteamTheatreFooter">
+                <div class="csrinruSteamTheatreCounter" aria-live="polite">${theatreMediaIndex + 1} of ${theatreMedia.length}</div>
+                ${renderTheatreThumbs(theatreMedia, theatreMediaIndex, theatreMediaTitle)}
+            </div>
+        `;
+    }
+
+    function setTheatreMedia(index) {
+        if (!theatreMedia.length) return;
+
+        stopTheatreVideo();
+        theatreMediaIndex = (index + theatreMedia.length) % theatreMedia.length;
+
+        const viewport = theatre.querySelector('.csrinruSteamTheatreViewport');
+        if (viewport) {
+            viewport.innerHTML = renderTheatreMediaItem(theatreMedia[theatreMediaIndex], theatreMediaIndex, theatreMediaTitle);
+        }
+
+        const counter = theatre.querySelector('.csrinruSteamTheatreCounter');
+        if (counter) {
+            counter.textContent = `${theatreMediaIndex + 1} of ${theatreMedia.length}`;
+        }
+
+        theatre.querySelectorAll('.csrinruSteamTheatreThumbBtn').forEach((button) => {
+            const buttonIndex = parseInt(button.dataset.theatreMediaIndex, 10);
+            const isActive = buttonIndex === theatreMediaIndex;
+            button.classList.toggle('csrinruSteamTheatreThumbActive', isActive);
+            button.setAttribute('aria-current', isActive ? 'true' : 'false');
+        });
+
+        const activeThumb = theatre.querySelector('.csrinruSteamTheatreThumbActive');
+        if (activeThumb) {
+            const strip = activeThumb.closest('.csrinruSteamTheatreThumbStrip');
+            if (strip) {
+                const stripRect = strip.getBoundingClientRect();
+                const thumbRect = activeThumb.getBoundingClientRect();
+
+                if (thumbRect.left < stripRect.left) {
+                    strip.scrollLeft -= stripRect.left - thumbRect.left;
+                } else if (thumbRect.right > stripRect.right) {
+                    strip.scrollLeft += thumbRect.right - stripRect.right;
+                }
+            }
+        }
+    }
+
+    async function playTheatreVideo() {
+        const item = theatreMedia[theatreMediaIndex];
+        if (!item || item.type !== 'video' || (!isUsableUrl(item.videoUrl) && !isUsableUrl(item.hlsUrl))) return;
+
+        const label = escapeHtml(item.alt || theatreMediaTitle || 'Steam video');
+        const poster = isUsableUrl(item.posterUrl) ? ` poster="${escapeHtml(item.posterUrl)}"` : '';
+        const viewport = theatre.querySelector('.csrinruSteamTheatreViewport');
+        if (!viewport) return;
+
+        stopTheatreVideo();
+        const directSrc = isUsableUrl(item.videoUrl) ? ` src="${escapeHtml(item.videoUrl)}"` : '';
+        viewport.innerHTML = `<video class="csrinruSteamTheatreVideo"${directSrc}${poster} controls autoplay playsinline aria-label="${label}"></video>`;
+
+        const video = viewport.querySelector('.csrinruSteamTheatreVideo');
+        if (!video) return;
+
+        if (isUsableUrl(item.videoUrl)) {
+            video.play().catch(() => null);
+            return;
+        }
+
+        if (video.canPlayType('application/vnd.apple.mpegurl')) {
+            video.src = item.hlsUrl;
+            video.play().catch(() => null);
+            return;
+        }
+
+        const HlsCtor = getHlsConstructor();
+        if (HlsCtor?.isSupported?.()) {
+            const hls = new HlsCtor();
+            theatreActiveHls = hls;
+            hls.loadSource(item.hlsUrl);
+            hls.attachMedia(video);
+            hls.on(HlsCtor.Events.MANIFEST_PARSED, () => {
+                if (theatreActiveHls === hls && theatre.contains(video)) {
+                    video.play().catch(() => null);
+                }
+            });
+            hls.on(HlsCtor.Events.ERROR, (_, data) => {
+                if (data?.fatal && theatreActiveHls === hls) {
+                    viewport.innerHTML = '<div class="csrinruSteamTheatreError">Trailer failed to load.</div>';
+                    try {
+                        hls.destroy();
+                    } catch (_) {
+                        // Ignore cleanup failures from HLS internals.
+                    }
+                    theatreActiveHls = null;
+                }
+            });
+            return;
+        }
+
+        viewport.innerHTML = '<div class="csrinruSteamTheatreError">Trailer playback is not supported in this browser.</div>';
+    }
+
+    function isTheatreOpen() {
+        return theatre.classList.contains('csrinruSteamTheatreOpen');
+    }
+
+    function openTheatre(index) {
+        if (!currentMedia.length) return;
+
+        theatreMedia = currentMedia.slice();
+        theatreMediaIndex = (index + theatreMedia.length) % theatreMedia.length;
+        theatreMediaTitle = currentMediaTitle || 'Steam media';
+        stopActiveVideo();
+        clearTimeout(hideTimeout);
+        clearTimeout(displayTimeout);
+        clearTimeout(showTimeout);
+
+        renderTheatre();
+        previousDocumentOverflow = document.documentElement.style.overflow;
+        document.documentElement.style.overflow = 'hidden';
+        theatre.classList.add('csrinruSteamTheatreOpen');
+        theatre.setAttribute('aria-hidden', 'false');
+        tip.style.opacity = '0';
+        tip.style.pointerEvents = 'none';
+        tip.style.display = 'none';
+        trackingMove = false;
+
+        const closeButton = theatre.querySelector('.csrinruSteamTheatreCloseBtn');
+        if (closeButton) {
+            try {
+                closeButton.focus({ preventScroll: true });
+            } catch (_) {
+                closeButton.focus();
+            }
+        }
+    }
+
+    function closeTheatre() {
+        if (!isTheatreOpen()) return;
+
+        if (document.fullscreenElement === theatre) {
+            document.exitFullscreen().catch(() => null);
+        }
+
+        stopTheatreVideo();
+        theatre.classList.remove('csrinruSteamTheatreOpen');
+        theatre.setAttribute('aria-hidden', 'true');
+        theatre.innerHTML = '';
+        document.documentElement.style.overflow = previousDocumentOverflow;
+        previousDocumentOverflow = '';
+        theatreMedia = [];
+        theatreMediaIndex = 0;
+        theatreMediaTitle = '';
+    }
+
+    async function toggleTheatreFullscreen() {
+        if (!isTheatreOpen()) return;
+
+        try {
+            if (document.fullscreenElement === theatre) {
+                await document.exitFullscreen();
+            } else if (!document.fullscreenElement && theatre.requestFullscreen) {
+                await theatre.requestFullscreen();
+            }
+        } catch (_) {
+            // Ignore browser fullscreen denials.
+        }
+
+        updateTheatreFullscreenButton();
+    }
+
+    function updateTheatreFullscreenButton() {
+        const button = theatre.querySelector('.csrinruSteamTheatreFullscreenBtn');
+        if (!button) return;
+
+        const label = document.fullscreenElement === theatre ? 'Exit fullscreen' : 'Enter fullscreen';
+        button.setAttribute('aria-label', label);
+        button.setAttribute('title', label);
     }
 
     function setActiveMedia(index) {
@@ -1194,11 +1927,33 @@
         if (counter) {
             counter.textContent = `${currentMediaIndex + 1} / ${currentMedia.length}`;
         }
+
+        tip.querySelectorAll('.steamMediaThumbBtn').forEach((button) => {
+            const buttonIndex = parseInt(button.dataset.mediaIndex, 10);
+            const isActive = buttonIndex === currentMediaIndex;
+            button.classList.toggle('steamMediaThumbActive', isActive);
+            button.setAttribute('aria-current', isActive ? 'true' : 'false');
+        });
+
+        const activeThumb = tip.querySelector('.steamMediaThumbActive');
+        if (activeThumb) {
+            const strip = activeThumb.closest('.steamMediaThumbStrip');
+            if (strip) {
+                const stripRect = strip.getBoundingClientRect();
+                const thumbRect = activeThumb.getBoundingClientRect();
+
+                if (thumbRect.left < stripRect.left) {
+                    strip.scrollLeft -= stripRect.left - thumbRect.left;
+                } else if (thumbRect.right > stripRect.right) {
+                    strip.scrollLeft += thumbRect.right - stripRect.right;
+                }
+            }
+        }
     }
 
-    function playActiveVideo() {
+    async function playActiveVideo() {
         const item = currentMedia[currentMediaIndex];
-        if (!item || item.type !== 'video' || !isUsableUrl(item.videoUrl)) return;
+        if (!item || item.type !== 'video' || (!isUsableUrl(item.videoUrl) && !isUsableUrl(item.hlsUrl))) return;
 
         const label = escapeHtml(item.alt || currentMediaTitle || 'Steam video');
         const poster = isUsableUrl(item.posterUrl) ? ` poster="${escapeHtml(item.posterUrl)}"` : '';
@@ -1206,7 +1961,49 @@
         if (!viewport) return;
 
         stopActiveVideo();
-        viewport.innerHTML = `<video class="steamMediaVideo" src="${escapeHtml(item.videoUrl)}"${poster} controls autoplay playsinline aria-label="${label}"></video>`;
+        const directSrc = isUsableUrl(item.videoUrl) ? ` src="${escapeHtml(item.videoUrl)}"` : '';
+        viewport.innerHTML = `<video class="steamMediaVideo"${directSrc}${poster} controls autoplay playsinline aria-label="${label}"></video>`;
+
+        const video = viewport.querySelector('.steamMediaVideo');
+        if (!video) return;
+
+        if (isUsableUrl(item.videoUrl)) {
+            video.play().catch(() => null);
+            return;
+        }
+
+        if (video.canPlayType('application/vnd.apple.mpegurl')) {
+            video.src = item.hlsUrl;
+            video.play().catch(() => null);
+            return;
+        }
+
+        const HlsCtor = getHlsConstructor();
+        if (HlsCtor?.isSupported?.()) {
+            const hls = new HlsCtor();
+            activeHls = hls;
+            hls.loadSource(item.hlsUrl);
+            hls.attachMedia(video);
+            hls.on(HlsCtor.Events.MANIFEST_PARSED, () => {
+                if (activeHls === hls && tip.contains(video)) {
+                    video.play().catch(() => null);
+                }
+            });
+            hls.on(HlsCtor.Events.ERROR, (_, data) => {
+                if (data?.fatal && activeHls === hls) {
+                    viewport.innerHTML = '<div class="steamMediaError">Trailer failed to load.</div>';
+                    try {
+                        hls.destroy();
+                    } catch (_) {
+                        // Ignore cleanup failures from HLS internals.
+                    }
+                    activeHls = null;
+                }
+            });
+            return;
+        }
+
+        viewport.innerHTML = '<div class="steamMediaError">Trailer playback is not supported in this browser.</div>';
     }
 
     function positionTip(ev) {
@@ -1337,6 +2134,14 @@
     tip.addEventListener('mouseleave', scheduleHideTip);
 
     tip.addEventListener('click', async (e) => {
+        const expandButton = e.target.closest('.steamMediaExpandBtn');
+        if (expandButton) {
+            e.preventDefault();
+            e.stopPropagation();
+            openTheatre(currentMediaIndex);
+            return;
+        }
+
         const prevButton = e.target.closest('.steamMediaPrevBtn');
         if (prevButton) {
             e.preventDefault();
@@ -1353,6 +2158,17 @@
             return;
         }
 
+        const thumbButton = e.target.closest('.steamMediaThumbBtn');
+        if (thumbButton) {
+            e.preventDefault();
+            e.stopPropagation();
+            const index = parseInt(thumbButton.dataset.mediaIndex, 10);
+            if (!isNaN(index)) {
+                setActiveMedia(index);
+            }
+            return;
+        }
+
         const playButton = e.target.closest('.steamMediaPlayBtn');
         if (playButton) {
             e.preventDefault();
@@ -1361,7 +2177,7 @@
             if (!isNaN(index) && index !== currentMediaIndex) {
                 setActiveMedia(index);
             }
-            playActiveVideo();
+            await playActiveVideo();
             return;
         }
 
@@ -1384,6 +2200,85 @@
             appIdButton.textContent = previousText;
         }, 900);
     });
+
+    theatre.addEventListener('click', async (e) => {
+        const closeButton = e.target.closest('.csrinruSteamTheatreCloseBtn');
+        if (closeButton) {
+            e.preventDefault();
+            e.stopPropagation();
+            closeTheatre();
+            return;
+        }
+
+        const fullscreenButton = e.target.closest('.csrinruSteamTheatreFullscreenBtn');
+        if (fullscreenButton) {
+            e.preventDefault();
+            e.stopPropagation();
+            await toggleTheatreFullscreen();
+            return;
+        }
+
+        const prevButton = e.target.closest('.csrinruSteamTheatrePrevBtn');
+        if (prevButton) {
+            e.preventDefault();
+            e.stopPropagation();
+            setTheatreMedia(theatreMediaIndex - 1);
+            return;
+        }
+
+        const nextButton = e.target.closest('.csrinruSteamTheatreNextBtn');
+        if (nextButton) {
+            e.preventDefault();
+            e.stopPropagation();
+            setTheatreMedia(theatreMediaIndex + 1);
+            return;
+        }
+
+        const thumbButton = e.target.closest('.csrinruSteamTheatreThumbBtn');
+        if (thumbButton) {
+            e.preventDefault();
+            e.stopPropagation();
+            const index = parseInt(thumbButton.dataset.theatreMediaIndex, 10);
+            if (!isNaN(index)) {
+                setTheatreMedia(index);
+            }
+            return;
+        }
+
+        const playButton = e.target.closest('.csrinruSteamTheatrePlayBtn');
+        if (playButton) {
+            e.preventDefault();
+            e.stopPropagation();
+            const index = parseInt(playButton.dataset.theatreMediaIndex, 10);
+            if (!isNaN(index) && index !== theatreMediaIndex) {
+                setTheatreMedia(index);
+            }
+            await playTheatreVideo();
+        }
+    });
+
+    document.addEventListener('keydown', (e) => {
+        if (!isTheatreOpen()) return;
+
+        if (e.key === 'Escape') {
+            e.preventDefault();
+            closeTheatre();
+            return;
+        }
+
+        if (e.key === 'ArrowLeft') {
+            e.preventDefault();
+            setTheatreMedia(theatreMediaIndex - 1);
+            return;
+        }
+
+        if (e.key === 'ArrowRight') {
+            e.preventDefault();
+            setTheatreMedia(theatreMediaIndex + 1);
+        }
+    });
+
+    document.addEventListener('fullscreenchange', updateTheatreFullscreenButton);
 
     document.addEventListener('mouseover', (e) => {
         const targetLink = e.target.closest(TOPIC_SELECTOR);
