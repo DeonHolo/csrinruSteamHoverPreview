@@ -5,7 +5,7 @@
 
 <center>
   <img
-    src="https://i.imgur.com/o82TnTb.png"
+    src="https://i.imgur.com/LdBNWBS.png"
     alt="Hover preview demo"
     style="max-width:100%; margin:8px 0;"
   />

@@ -65,6 +65,8 @@
     let theatreMedia = [];
     let theatreMediaIndex = 0;
     let theatreMediaTitle = '';
+    let theatreMode = 'screenshots';
+    let theatreAllMedia = [];
     let theatreActiveHls = null;
     let previousDocumentOverflow = '';
 
@@ -578,18 +580,40 @@
             background: rgba(0, 0, 0, 0.74);
             outline: 1px solid #99d2f7;
         }
+        .csrinruSteamHoverTip .steamMediaExpandHidden {
+            display: none;
+        }
         .csrinruSteamTheatre {
             position: fixed;
             inset: 0;
             display: none;
-            grid-template-rows: 34px minmax(0, 1fr) auto;
-            background: rgba(0, 0, 0, 0.88);
+            place-items: center;
+            padding: 48px;
+            background: rgba(0, 0, 0, 0.78);
             color: #c7d5e0;
             font: 12px/1.45 Arial, Helvetica, sans-serif;
             z-index: 2147483647;
+            box-sizing: border-box;
         }
         .csrinruSteamTheatreOpen {
             display: grid;
+        }
+        .csrinruSteamTheatreShell {
+            display: grid;
+            grid-template-rows: 34px minmax(0, 1fr) auto;
+            width: min(1416px, calc(100vw - 96px));
+            height: min(866px, calc(100vh - 96px));
+            overflow: hidden;
+            background: #050505;
+            box-shadow: 0 8px 36px rgba(0, 0, 0, 0.72);
+        }
+        .csrinruSteamTheatre:fullscreen {
+            padding: 0;
+            background: #000;
+        }
+        .csrinruSteamTheatre:fullscreen .csrinruSteamTheatreShell {
+            width: 100vw;
+            height: 100vh;
         }
         .csrinruSteamTheatreHeader {
             position: relative;
@@ -613,11 +637,11 @@
             top: 5px;
             right: 8px;
             display: flex;
+            align-items: center;
             gap: 6px;
         }
         .csrinruSteamTheatreBtn,
-        .csrinruSteamTheatreNavBtn,
-        .csrinruSteamTheatrePlayBtn {
+        .csrinruSteamTheatreNavBtn {
             margin: 0;
             border: 0;
             color: #f2f2f2;
@@ -664,33 +688,110 @@
             object-fit: contain;
             background: #000;
         }
-        .csrinruSteamTheatrePlayBtn {
+        .csrinruSteamTheatreVideoWrap {
             position: relative;
-            display: block;
             width: 100%;
             height: 100%;
-            padding: 0;
-            background: #050505;
+            background: #000;
         }
-        .csrinruSteamTheatrePlayIcon {
+        .csrinruSteamTheatreVideoWrap:fullscreen {
+            width: 100vw;
+            height: 100vh;
+        }
+        .csrinruSteamTheatreVideoControls {
             position: absolute;
-            top: 50%;
-            left: 50%;
+            left: 8px;
+            right: 8px;
+            bottom: 42px;
+            display: grid;
+            gap: 6px;
+            padding: 9px 10px 8px;
+            background: linear-gradient(to top, rgba(0, 0, 0, 0.68), rgba(0, 0, 0, 0));
+            color: #f2f2f2;
+            z-index: 3;
+        }
+        .csrinruSteamTheatreVideoSeek {
+            width: 100%;
+            height: 10px;
+            margin: 0;
+            accent-color: #1a9fff;
+            cursor: pointer;
+        }
+        .csrinruSteamTheatreVideoControlRow {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            min-width: 0;
+        }
+        .csrinruSteamTheatreVideoControlSpacer {
+            flex: 1 1 auto;
+        }
+        .csrinruSteamTheatreVideoControlBtn {
             display: grid;
             place-items: center;
-            width: 64px;
-            height: 64px;
-            border-radius: 50%;
-            background: rgba(0, 0, 0, 0.62);
+            width: 28px;
+            height: 24px;
+            margin: 0;
+            padding: 0;
+            background: transparent;
+            border: 0;
             color: #f2f2f2;
-            font-size: 34px;
-            line-height: 1;
-            transform: translate(-50%, -50%);
+            font: bold 18px/1 Arial, Helvetica, sans-serif;
+            cursor: pointer;
+            opacity: 0.86;
+            touch-action: manipulation;
         }
-        .csrinruSteamTheatrePlayBtn:hover .csrinruSteamTheatrePlayIcon,
-        .csrinruSteamTheatrePlayBtn:focus .csrinruSteamTheatrePlayIcon {
-            background: rgba(0, 0, 0, 0.78);
+        .csrinruSteamTheatreVideoControlBtn:hover,
+        .csrinruSteamTheatreVideoControlBtn:focus {
+            opacity: 1;
             outline: 1px solid #99d2f7;
+        }
+        .csrinruSteamTheatreVideoTime {
+            flex: 0 0 auto;
+            color: #d6e8ee;
+            font-size: 13px;
+            white-space: nowrap;
+        }
+        .csrinruSteamTheatreQualityWrap {
+            position: relative;
+        }
+        .csrinruSteamTheatreQualityMenu {
+            position: absolute;
+            right: 0;
+            bottom: 30px;
+            display: none;
+            min-width: 96px;
+            padding: 4px;
+            background: rgba(17, 24, 32, 0.98);
+            border: 1px solid #3d4b59;
+            box-shadow: 0 4px 14px rgba(0, 0, 0, 0.55);
+        }
+        .csrinruSteamTheatreQualityOpen .csrinruSteamTheatreQualityMenu {
+            display: grid;
+            gap: 2px;
+        }
+        .csrinruSteamTheatreQualityOption {
+            display: block;
+            width: 100%;
+            margin: 0;
+            padding: 4px 8px;
+            background: transparent;
+            border: 0;
+            color: #d6e8ee;
+            font: 12px/1.2 Arial, Helvetica, sans-serif;
+            text-align: left;
+            cursor: pointer;
+        }
+        .csrinruSteamTheatreQualityOption:hover,
+        .csrinruSteamTheatreQualityOption:focus,
+        .csrinruSteamTheatreQualityActive {
+            background: #2a475e;
+            color: #fff;
+            outline: none;
+        }
+        .csrinruSteamTheatreQualityUnavailable {
+            opacity: 0.45;
+            cursor: default;
         }
         .csrinruSteamTheatreNavBtn {
             position: absolute;
@@ -718,86 +819,30 @@
             right: 0;
         }
         .csrinruSteamTheatreFooter {
+            position: relative;
             display: grid;
-            gap: 8px;
-            padding: 8px 18px 12px;
+            place-items: center;
+            min-height: 33px;
+            padding: 7px 72px 8px;
             background: #20262e;
             box-sizing: border-box;
+        }
+        .csrinruSteamTheatreVideoMode .csrinruSteamTheatreFooter {
+            padding: 7px 72px 8px;
         }
         .csrinruSteamTheatreCounter {
             color: #9fb0bf;
             font-size: 12px;
             text-align: center;
         }
-        .csrinruSteamTheatreThumbStrip {
-            display: flex;
-            gap: 4px;
-            width: 100%;
-            max-width: 980px;
-            margin: 0 auto;
-            overflow-x: auto;
-            scrollbar-width: thin;
-            scrollbar-color: #40566a #151515;
-        }
-        .csrinruSteamTheatreThumbStripFit {
-            overflow-x: hidden;
-        }
-        .csrinruSteamTheatreThumbStrip::-webkit-scrollbar {
-            height: 7px;
-        }
-        .csrinruSteamTheatreThumbStrip::-webkit-scrollbar-track {
-            background: #151515;
-        }
-        .csrinruSteamTheatreThumbStrip::-webkit-scrollbar-thumb {
-            background: #40566a;
-            border-radius: 999px;
-        }
-        .csrinruSteamTheatreThumbBtn {
-            position: relative;
-            flex: 0 0 74px;
-            width: 74px;
-            height: 42px;
-            margin: 0;
-            padding: 0;
-            overflow: hidden;
-            background: #111;
-            border: 1px solid #333;
-            border-radius: 2px;
-            cursor: pointer;
-            opacity: 0.72;
-            touch-action: manipulation;
-        }
-        .csrinruSteamTheatreThumbStripFit .csrinruSteamTheatreThumbBtn {
-            flex: 1 1 0;
-            width: auto;
-            min-width: 0;
-        }
-        .csrinruSteamTheatreThumbBtn:hover,
-        .csrinruSteamTheatreThumbBtn:focus,
-        .csrinruSteamTheatreThumbActive {
-            opacity: 1;
-            border-color: #99d2f7;
-            outline: 1px solid rgba(153, 210, 247, 0.62);
-        }
-        .csrinruSteamTheatreThumbImage {
-            display: block;
-            width: 100%;
-            height: 100%;
-            object-fit: cover;
-        }
-        .csrinruSteamTheatreThumbPlayIcon {
+        .csrinruSteamTheatreFooterControlsHost {
             position: absolute;
-            right: 4px;
-            bottom: 4px;
-            display: grid;
-            place-items: center;
-            width: 18px;
-            height: 18px;
-            border-radius: 50%;
-            background: rgba(0, 0, 0, 0.72);
-            color: #f2f2f2;
-            font-size: 11px;
-            line-height: 1;
+            top: 50%;
+            right: 18px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            transform: translateY(-50%);
         }
         .csrinruSteamTheatreError {
             display: grid;
@@ -1023,7 +1068,78 @@
             .find(Boolean) || '';
     }
 
+    function getVideoQualityValue(key) {
+        const normalized = String(key || '').toLowerCase();
+        if (normalized === 'max' || normalized === 'hd') return 10000;
+
+        const numeric = parseInt(normalized.replace(/[^\d]/g, ''), 10);
+        return isNaN(numeric) ? 0 : numeric;
+    }
+
+    function getVideoSourceLabel(format, key) {
+        const upperFormat = String(format || 'Video').toUpperCase();
+        const normalized = String(key || '').toLowerCase();
+
+        if (normalized === 'max') return `${upperFormat} HD`;
+        if (/^\d+p?$/.test(normalized)) return `${upperFormat} ${parseInt(normalized, 10)}p`;
+        if (normalized) return `${upperFormat} ${normalized.toUpperCase()}`;
+        return upperFormat;
+    }
+
+    function collectVideoSources(source, format) {
+        if (!source) return [];
+
+        if (typeof source === 'string') {
+            const url = getUsableMediaUrl(source);
+            return url ? [{
+                url,
+                label: getVideoSourceLabel(format, ''),
+                format: String(format || 'video').toLowerCase(),
+                quality: 0
+            }] : [];
+        }
+
+        return Object.entries(source)
+            .map(([key, value]) => {
+                const url = getUsableMediaUrl(value);
+                if (!url) return null;
+
+                return {
+                    url,
+                    label: getVideoSourceLabel(format, key),
+                    format: String(format || 'video').toLowerCase(),
+                    quality: getVideoQualityValue(key)
+                };
+            })
+            .filter(Boolean);
+    }
+
+    function getMovieVideoSources(movie) {
+        const sources = [
+            ...collectVideoSources(movie?.mp4, 'MP4'),
+            ...collectVideoSources(movie?.webm, 'WebM'),
+            ...collectVideoSources(movie?.video_url, 'MP4')
+        ];
+        const seen = new Set();
+
+        return sources
+            .filter((source) => {
+                if (!source.url || seen.has(source.url)) return false;
+                seen.add(source.url);
+                return true;
+            })
+            .sort((a, b) => {
+                const qualityDiff = b.quality - a.quality;
+                if (qualityDiff) return qualityDiff;
+                if (a.format === b.format) return 0;
+                if (a.format === 'mp4') return -1;
+                if (b.format === 'mp4') return 1;
+                return a.format.localeCompare(b.format);
+            });
+    }
+
     function getMovieSources(movie) {
+        const videoSources = getMovieVideoSources(movie);
         const videoUrl = getPreferredVideoUrl(movie?.mp4) ||
             getPreferredVideoUrl(movie?.webm) ||
             getUsableMediaUrl(movie?.video_url);
@@ -1035,7 +1151,7 @@
         const dashUrl = getUsableMediaUrl(movie?.dash_h264) ||
             getUsableMediaUrl(movie?.dash_av1);
 
-        return { videoUrl, hlsUrl, dashUrl };
+        return { videoUrl: videoSources[0]?.url || videoUrl, hlsUrl, dashUrl, videoSources };
     }
 
     function normalizeSteamMedia(appData) {
@@ -1061,7 +1177,7 @@
 
         (appData?.movies || []).forEach((movie, index) => {
             const posterUrl = getUsableMediaUrl(movie?.thumbnail);
-            const { videoUrl, hlsUrl, dashUrl } = getMovieSources(movie);
+            const { videoUrl, hlsUrl, dashUrl, videoSources } = getMovieSources(movie);
             if (!isUsableUrl(posterUrl) || (!isUsableUrl(videoUrl) && !isUsableUrl(hlsUrl))) return;
 
             addMedia({
@@ -1069,6 +1185,7 @@
                 source: 'movie',
                 posterUrl,
                 videoUrl,
+                videoSources,
                 hlsUrl,
                 dashUrl,
                 alt: movie?.name || `${title} video ${index + 1}`
@@ -1621,6 +1738,26 @@
         return item.type === 'video' ? item.posterUrl : (item.thumbUrl || item.url);
     }
 
+    function isScreenshotMedia(item) {
+        return item?.type === 'image' && item?.source === 'screenshot';
+    }
+
+    function isVideoMedia(item) {
+        return item?.type === 'video';
+    }
+
+    function canOpenMediaTheatre(item) {
+        return isScreenshotMedia(item) || isVideoMedia(item);
+    }
+
+    function getTheatreCounterText() {
+        const item = theatreMedia[theatreMediaIndex];
+        const ordinal = theatreAllMedia.indexOf(item);
+        const count = theatreAllMedia.length || theatreMedia.length;
+        const position = ordinal >= 0 ? ordinal + 1 : theatreMediaIndex + 1;
+        return `${position} of ${count}`;
+    }
+
     function renderMediaThumbs(media, activeIndex, title) {
         if (!media?.length || media.length <= 1) return '';
 
@@ -1656,12 +1793,13 @@
             <button type="button" class="steamMediaNavBtn steamMediaNextBtn" aria-label="Next Steam media" title="Next media">&#8250;</button>
             <span class="steamMediaCounter" aria-live="polite">1 / ${escapeHtml(media.length)}</span>
         ` : '';
+        const expandClass = canOpenMediaTheatre(media[0]) ? '' : ' steamMediaExpandHidden';
 
         return `
             <div class="steamMediaShell">
                 <div class="steamMediaFrame" aria-label="Steam media preview">
                     <div class="steamMediaViewport">${renderMediaItem(media[0], 0, title)}</div>
-                    <button type="button" class="steamMediaExpandBtn" aria-label="Open media theatre" title="Open theatre mode">&#9974;</button>
+                    <button type="button" class="steamMediaExpandBtn${expandClass}" aria-label="Open media theatre" title="Open theatre mode">&#9974;</button>
                     ${controlsHtml}
                 </div>
                 ${renderMediaThumbs(media, 0, title)}
@@ -1675,40 +1813,37 @@
         const label = escapeHtml(item.alt || title || 'Steam media');
         if (item.type === 'video') {
             return `
-                <button type="button" class="csrinruSteamTheatrePlayBtn" data-theatre-media-index="${index}" aria-label="Play ${label}" title="Play video">
-                    <img class="csrinruSteamTheatrePoster" src="${escapeHtml(item.posterUrl)}" alt="${label}" loading="lazy" onerror="this.style.display='none'">
-                    <span class="csrinruSteamTheatrePlayIcon" aria-hidden="true">&#9658;</span>
-                </button>
+                <div class="csrinruSteamTheatreVideoWrap">
+                    <video class="csrinruSteamTheatreVideo" data-theatre-media-index="${index}" autoplay playsinline tabindex="0" aria-label="${label}"></video>
+                    <div class="csrinruSteamTheatreVideoControls" aria-label="Video controls">
+                        <input class="csrinruSteamTheatreVideoSeek" type="range" min="0" max="0" step="0.1" value="0" aria-label="Seek video">
+                        <div class="csrinruSteamTheatreVideoControlRow">
+                            <button type="button" class="csrinruSteamTheatreVideoControlBtn csrinruSteamTheatreVideoPlayToggle" aria-label="Play video" title="Play">&#9658;</button>
+                            <button type="button" class="csrinruSteamTheatreVideoControlBtn csrinruSteamTheatreVideoMuteToggle" aria-label="Mute video" title="Mute">&#128266;</button>
+                            <span class="csrinruSteamTheatreVideoTime">0:00 / 0:00</span>
+                            <span class="csrinruSteamTheatreVideoControlSpacer"></span>
+                            <span class="csrinruSteamTheatreQualityWrap">
+                                <button type="button" class="csrinruSteamTheatreVideoControlBtn csrinruSteamTheatreQualityToggle csrinruSteamTheatreQualityUnavailable" aria-label="Video quality" title="Quality" disabled>&#9881;</button>
+                                <span class="csrinruSteamTheatreQualityMenu" aria-label="Video quality menu"></span>
+                            </span>
+                            <button type="button" class="csrinruSteamTheatreVideoControlBtn csrinruSteamTheatreFullscreenBtn" aria-label="Toggle theatre fullscreen" title="Theatre fullscreen">&#9645;</button>
+                            <button type="button" class="csrinruSteamTheatreVideoControlBtn csrinruSteamTheatreVideoFullscreenBtn" aria-label="Toggle video fullscreen" title="Video fullscreen">&#9974;</button>
+                        </div>
+                    </div>
+                </div>
             `;
         }
 
         return `<img class="csrinruSteamTheatreImage" src="${escapeHtml(item.url)}" alt="${label}" loading="lazy" onerror="this.style.display='none'">`;
     }
 
-    function renderTheatreThumbs(media, activeIndex, title) {
-        if (!media?.length || media.length <= 1) return '';
+    function renderTheatreFooterControls() {
+        if (!isScreenshotMedia(theatreMedia[theatreMediaIndex])) return '';
 
-        const fitClass = media.length <= 8 ? ' csrinruSteamTheatreThumbStripFit' : '';
-        const thumbsHtml = media.map((item, index) => {
-            const thumbUrl = getMediaThumbUrl(item);
-            if (!isUsableUrl(thumbUrl)) return '';
-
-            const label = escapeHtml(item.alt || title || `Steam media ${index + 1}`);
-            const activeClass = index === activeIndex ? ' csrinruSteamTheatreThumbActive' : '';
-            const current = index === activeIndex ? 'true' : 'false';
-            const videoIcon = item.type === 'video' ?
-                '<span class="csrinruSteamTheatreThumbPlayIcon" aria-hidden="true">&#9658;</span>' :
-                '';
-
-            return `
-                <button type="button" class="csrinruSteamTheatreThumbBtn${activeClass}" data-theatre-media-index="${index}" aria-label="Show ${label}" aria-current="${current}" title="${label}">
-                    <img class="csrinruSteamTheatreThumbImage" src="${escapeHtml(thumbUrl)}" alt="" loading="lazy" onerror="this.style.display='none'">
-                    ${videoIcon}
-                </button>
-            `;
-        }).join('');
-
-        return `<div class="csrinruSteamTheatreThumbStrip${fitClass}" aria-label="Steam media thumbnails">${thumbsHtml}</div>`;
+        const fullscreenLabel = document.fullscreenElement === theatre ? 'Exit fullscreen' : 'Enter fullscreen';
+        return `
+            <button type="button" class="csrinruSteamTheatreVideoControlBtn csrinruSteamTheatreFullscreenBtn" aria-label="${fullscreenLabel}" title="${fullscreenLabel}">&#9974;</button>
+        `;
     }
 
     function renderTheatre() {
@@ -1719,23 +1854,24 @@
             <button type="button" class="csrinruSteamTheatreNavBtn csrinruSteamTheatrePrevBtn" aria-label="Previous Steam media" title="Previous media">&#8249;</button>
             <button type="button" class="csrinruSteamTheatreNavBtn csrinruSteamTheatreNextBtn" aria-label="Next Steam media" title="Next media">&#8250;</button>
         ` : '';
-        const fullscreenLabel = document.fullscreenElement === theatre ? 'Exit fullscreen' : 'Enter fullscreen';
+        const footerControlsHtml = renderTheatreFooterControls();
 
         theatre.innerHTML = `
-            <div class="csrinruSteamTheatreHeader">
-                <div class="csrinruSteamTheatreTitle">${escapeHtml(theatreMediaTitle)} - Trailers &amp; Screenshots</div>
-                <div class="csrinruSteamTheatreHeaderControls">
-                    <button type="button" class="csrinruSteamTheatreBtn csrinruSteamTheatreFullscreenBtn" aria-label="${fullscreenLabel}" title="${fullscreenLabel}">&#9974;</button>
-                    <button type="button" class="csrinruSteamTheatreBtn csrinruSteamTheatreCloseBtn" aria-label="Close theatre" title="Close">&times;</button>
+            <div class="csrinruSteamTheatreShell">
+                <div class="csrinruSteamTheatreHeader">
+                    <div class="csrinruSteamTheatreTitle">${escapeHtml(theatreMediaTitle)} - Trailers &amp; Screenshots</div>
+                    <div class="csrinruSteamTheatreHeaderControls">
+                        <button type="button" class="csrinruSteamTheatreBtn csrinruSteamTheatreCloseBtn" aria-label="Close theatre" title="Close">&times;</button>
+                    </div>
                 </div>
-            </div>
-            <div class="csrinruSteamTheatreStage">
-                <div class="csrinruSteamTheatreViewport">${renderTheatreMediaItem(theatreMedia[theatreMediaIndex], theatreMediaIndex, theatreMediaTitle)}</div>
-                ${navHtml}
-            </div>
-            <div class="csrinruSteamTheatreFooter">
-                <div class="csrinruSteamTheatreCounter" aria-live="polite">${theatreMediaIndex + 1} of ${theatreMedia.length}</div>
-                ${renderTheatreThumbs(theatreMedia, theatreMediaIndex, theatreMediaTitle)}
+                <div class="csrinruSteamTheatreStage">
+                    <div class="csrinruSteamTheatreViewport">${renderTheatreMediaItem(theatreMedia[theatreMediaIndex], theatreMediaIndex, theatreMediaTitle)}</div>
+                    ${navHtml}
+                </div>
+                <div class="csrinruSteamTheatreFooter">
+                    <div class="csrinruSteamTheatreCounter" aria-live="polite">${getTheatreCounterText()}</div>
+                    <div class="csrinruSteamTheatreFooterControlsHost">${footerControlsHtml}</div>
+                </div>
             </div>
         `;
     }
@@ -1743,8 +1879,25 @@
     function setTheatreMedia(index) {
         if (!theatreMedia.length) return;
 
+        const nextIndex = (index + theatreMedia.length) % theatreMedia.length;
+        const nextItem = theatreMedia[nextIndex];
+
         stopTheatreVideo();
-        theatreMediaIndex = (index + theatreMedia.length) % theatreMedia.length;
+
+        if (theatreMode === 'video' && isScreenshotMedia(nextItem)) {
+            const screenshots = currentMedia.filter(isScreenshotMedia);
+            const screenshotIndex = screenshots.indexOf(nextItem);
+            if (screenshotIndex >= 0) {
+                theatreMode = 'screenshots';
+                theatreMedia = screenshots;
+                theatreMediaIndex = screenshotIndex;
+                theatre.classList.remove('csrinruSteamTheatreVideoMode');
+                renderTheatre();
+                return;
+            }
+        }
+
+        theatreMediaIndex = nextIndex;
 
         const viewport = theatre.querySelector('.csrinruSteamTheatreViewport');
         if (viewport) {
@@ -1753,29 +1906,173 @@
 
         const counter = theatre.querySelector('.csrinruSteamTheatreCounter');
         if (counter) {
-            counter.textContent = `${theatreMediaIndex + 1} of ${theatreMedia.length}`;
+            counter.textContent = getTheatreCounterText();
         }
 
-        theatre.querySelectorAll('.csrinruSteamTheatreThumbBtn').forEach((button) => {
-            const buttonIndex = parseInt(button.dataset.theatreMediaIndex, 10);
-            const isActive = buttonIndex === theatreMediaIndex;
-            button.classList.toggle('csrinruSteamTheatreThumbActive', isActive);
-            button.setAttribute('aria-current', isActive ? 'true' : 'false');
+        const footerControls = theatre.querySelector('.csrinruSteamTheatreFooterControlsHost');
+        if (footerControls) {
+            footerControls.innerHTML = renderTheatreFooterControls();
+        }
+
+        if (theatreMode === 'video') {
+            playTheatreVideo();
+        }
+    }
+
+    function getHlsLevelLabel(level, fallbackIndex) {
+        if (level?.height) return `${level.height}p`;
+        if (level?.bitrate) return `${Math.round(level.bitrate / 1000)} kbps`;
+        return `Level ${fallbackIndex + 1}`;
+    }
+
+    function formatVideoTime(value) {
+        if (!isFinite(value) || value < 0) return '0:00';
+
+        const total = Math.floor(value);
+        const hours = Math.floor(total / 3600);
+        const minutes = Math.floor((total % 3600) / 60);
+        const seconds = total % 60;
+        const paddedSeconds = String(seconds).padStart(2, '0');
+
+        return hours ? `${hours}:${String(minutes).padStart(2, '0')}:${paddedSeconds}` : `${minutes}:${paddedSeconds}`;
+    }
+
+    function resetTheatreQualityMenu() {
+        const wrap = theatre.querySelector('.csrinruSteamTheatreQualityWrap');
+        const toggle = theatre.querySelector('.csrinruSteamTheatreQualityToggle');
+        const menu = theatre.querySelector('.csrinruSteamTheatreQualityMenu');
+        if (!wrap || !toggle || !menu) return;
+
+        wrap.classList.remove('csrinruSteamTheatreQualityOpen');
+        menu.innerHTML = '<button type="button" class="csrinruSteamTheatreQualityOption csrinruSteamTheatreQualityActive" data-quality-level="-1">Auto</button>';
+        toggle.disabled = true;
+        toggle.classList.add('csrinruSteamTheatreQualityUnavailable');
+    }
+
+    function populateTheatreQualityMenu(hls) {
+        const toggle = theatre.querySelector('.csrinruSteamTheatreQualityToggle');
+        const menu = theatre.querySelector('.csrinruSteamTheatreQualityMenu');
+        if (!toggle || !menu || !hls?.levels?.length) return false;
+
+        const levels = hls.levels
+            .map((level, index) => ({
+                index,
+                label: getHlsLevelLabel(level, index),
+                height: level?.height || 0,
+                bitrate: level?.bitrate || 0
+            }))
+            .sort((a, b) => b.height - a.height || b.bitrate - a.bitrate);
+        const seenLabels = new Set();
+        const options = ['<button type="button" class="csrinruSteamTheatreQualityOption csrinruSteamTheatreQualityActive" data-quality-level="-1">Auto</button>'];
+
+        levels.forEach((level) => {
+            if (seenLabels.has(level.label)) return;
+            seenLabels.add(level.label);
+            options.push(`<button type="button" class="csrinruSteamTheatreQualityOption" data-quality-level="${level.index}">${escapeHtml(level.label)}</button>`);
         });
 
-        const activeThumb = theatre.querySelector('.csrinruSteamTheatreThumbActive');
-        if (activeThumb) {
-            const strip = activeThumb.closest('.csrinruSteamTheatreThumbStrip');
-            if (strip) {
-                const stripRect = strip.getBoundingClientRect();
-                const thumbRect = activeThumb.getBoundingClientRect();
+        if (options.length <= 1) return false;
 
-                if (thumbRect.left < stripRect.left) {
-                    strip.scrollLeft -= stripRect.left - thumbRect.left;
-                } else if (thumbRect.right > stripRect.right) {
-                    strip.scrollLeft += thumbRect.right - stripRect.right;
-                }
+        menu.innerHTML = options.join('');
+        toggle.disabled = false;
+        toggle.classList.remove('csrinruSteamTheatreQualityUnavailable');
+        return true;
+    }
+
+    function getTheatreDirectVideoSources(item) {
+        const sources = Array.isArray(item?.videoSources) ? item.videoSources : [];
+        const normalizedSources = sources
+            .map((source) => ({
+                url: getUsableMediaUrl(source?.url),
+                label: source?.label || 'Video'
+            }))
+            .filter(source => source.url);
+
+        if (normalizedSources.length) return normalizedSources;
+
+        const fallbackUrl = getUsableMediaUrl(item?.videoUrl);
+        return fallbackUrl ? [{ url: fallbackUrl, label: 'Video' }] : [];
+    }
+
+    function populateTheatreDirectQualityMenu(item, activeUrl) {
+        const toggle = theatre.querySelector('.csrinruSteamTheatreQualityToggle');
+        const menu = theatre.querySelector('.csrinruSteamTheatreQualityMenu');
+        const sources = getTheatreDirectVideoSources(item);
+        if (!toggle || !menu || sources.length <= 1) return;
+
+        const activeSourceUrl = getUsableMediaUrl(activeUrl) || sources[0].url;
+        menu.innerHTML = sources.map((source, index) => {
+            const activeClass = source.url === activeSourceUrl ? ' csrinruSteamTheatreQualityActive' : '';
+            return `<button type="button" class="csrinruSteamTheatreQualityOption${activeClass}" data-video-source-index="${index}">${escapeHtml(source.label)}</button>`;
+        }).join('');
+        toggle.disabled = false;
+        toggle.classList.remove('csrinruSteamTheatreQualityUnavailable');
+    }
+
+    function updateTheatreVideoControls(video) {
+        if (!video) return;
+
+        const playButton = theatre.querySelector('.csrinruSteamTheatreVideoPlayToggle');
+        const muteButton = theatre.querySelector('.csrinruSteamTheatreVideoMuteToggle');
+        const seek = theatre.querySelector('.csrinruSteamTheatreVideoSeek');
+        const timeLabel = theatre.querySelector('.csrinruSteamTheatreVideoTime');
+        const duration = isFinite(video.duration) ? video.duration : 0;
+        const currentTime = isFinite(video.currentTime) ? video.currentTime : 0;
+
+        if (playButton) {
+            playButton.innerHTML = video.paused ? '&#9658;' : '&#10074;&#10074;';
+            playButton.setAttribute('aria-label', video.paused ? 'Play video' : 'Pause video');
+            playButton.setAttribute('title', video.paused ? 'Play' : 'Pause');
+        }
+
+        if (muteButton) {
+            muteButton.innerHTML = video.muted || video.volume === 0 ? '&#128263;' : '&#128266;';
+            muteButton.setAttribute('aria-label', video.muted ? 'Unmute video' : 'Mute video');
+            muteButton.setAttribute('title', video.muted ? 'Unmute' : 'Mute');
+        }
+
+        if (seek) {
+            seek.max = String(duration || 0);
+            seek.value = String(Math.min(currentTime, duration || currentTime));
+        }
+
+        if (timeLabel) {
+            timeLabel.textContent = `${formatVideoTime(currentTime)} / ${formatVideoTime(duration)}`;
+        }
+    }
+
+    function bindTheatreVideoEvents(video) {
+        if (!video || video.dataset.controlsBound === 'true') return;
+
+        video.dataset.controlsBound = 'true';
+        ['timeupdate', 'durationchange', 'play', 'pause', 'volumechange', 'loadedmetadata'].forEach((eventName) => {
+            video.addEventListener(eventName, () => updateTheatreVideoControls(video));
+        });
+        updateTheatreVideoControls(video);
+    }
+
+    function loadTheatreVideoSource(video, sourceUrl, preserveState = false) {
+        const playableUrl = getUsableMediaUrl(sourceUrl);
+        if (!video || !playableUrl) return;
+
+        const previousTime = preserveState && isFinite(video.currentTime) ? video.currentTime : 0;
+        const shouldResume = preserveState ? !video.paused : true;
+
+        video.src = playableUrl;
+        video.load();
+        video.addEventListener('loadedmetadata', () => {
+            if (previousTime && isFinite(video.duration)) {
+                video.currentTime = Math.min(previousTime, Math.max(0, video.duration - 0.25));
             }
+
+            if (shouldResume) {
+                video.play().catch(() => null);
+            }
+            updateTheatreVideoControls(video);
+        }, { once: true });
+
+        if (shouldResume) {
+            video.play().catch(() => null);
         }
     }
 
@@ -1784,50 +2081,68 @@
         if (!item || item.type !== 'video' || (!isUsableUrl(item.videoUrl) && !isUsableUrl(item.hlsUrl))) return;
 
         const label = escapeHtml(item.alt || theatreMediaTitle || 'Steam video');
-        const poster = isUsableUrl(item.posterUrl) ? ` poster="${escapeHtml(item.posterUrl)}"` : '';
         const viewport = theatre.querySelector('.csrinruSteamTheatreViewport');
         if (!viewport) return;
 
         stopTheatreVideo();
+        resetTheatreQualityMenu();
         const directSrc = isUsableUrl(item.videoUrl) ? ` src="${escapeHtml(item.videoUrl)}"` : '';
-        viewport.innerHTML = `<video class="csrinruSteamTheatreVideo"${directSrc}${poster} controls autoplay playsinline aria-label="${label}"></video>`;
+        let video = viewport.querySelector('.csrinruSteamTheatreVideo');
+        if (!video) {
+            viewport.innerHTML = `<video class="csrinruSteamTheatreVideo"${directSrc} autoplay playsinline tabindex="0" aria-label="${label}"></video>`;
+            video = viewport.querySelector('.csrinruSteamTheatreVideo');
+        }
 
-        const video = viewport.querySelector('.csrinruSteamTheatreVideo');
         if (!video) return;
-
-        if (isUsableUrl(item.videoUrl)) {
-            video.play().catch(() => null);
-            return;
-        }
-
-        if (video.canPlayType('application/vnd.apple.mpegurl')) {
-            video.src = item.hlsUrl;
-            video.play().catch(() => null);
-            return;
-        }
+        video.setAttribute('aria-label', label);
+        bindTheatreVideoEvents(video);
 
         const HlsCtor = getHlsConstructor();
-        if (HlsCtor?.isSupported?.()) {
+        if (isUsableUrl(item.hlsUrl) && HlsCtor?.isSupported?.()) {
             const hls = new HlsCtor();
             theatreActiveHls = hls;
             hls.loadSource(item.hlsUrl);
             hls.attachMedia(video);
             hls.on(HlsCtor.Events.MANIFEST_PARSED, () => {
                 if (theatreActiveHls === hls && theatre.contains(video)) {
+                    const hasHlsQualityOptions = populateTheatreQualityMenu(hls);
+                    if (!hasHlsQualityOptions) {
+                        populateTheatreDirectQualityMenu(item, item.videoUrl);
+                    }
                     video.play().catch(() => null);
                 }
             });
             hls.on(HlsCtor.Events.ERROR, (_, data) => {
-                if (data?.fatal && theatreActiveHls === hls) {
+                if (!data?.fatal || theatreActiveHls !== hls) return;
+
+                try {
+                    hls.destroy();
+                } catch (_) {
+                    // Ignore cleanup failures from HLS internals.
+                }
+                theatreActiveHls = null;
+
+                if (isUsableUrl(item.videoUrl)) {
+                    resetTheatreQualityMenu();
+                    loadTheatreVideoSource(video, item.videoUrl);
+                    populateTheatreDirectQualityMenu(item, item.videoUrl);
+                } else {
                     viewport.innerHTML = '<div class="csrinruSteamTheatreError">Trailer failed to load.</div>';
-                    try {
-                        hls.destroy();
-                    } catch (_) {
-                        // Ignore cleanup failures from HLS internals.
-                    }
-                    theatreActiveHls = null;
                 }
             });
+            return;
+        }
+
+        if (isUsableUrl(item.videoUrl)) {
+            loadTheatreVideoSource(video, item.videoUrl);
+            populateTheatreDirectQualityMenu(item, item.videoUrl);
+            return;
+        }
+
+        if (video.canPlayType('application/vnd.apple.mpegurl')) {
+            video.src = item.hlsUrl;
+            populateTheatreDirectQualityMenu(item, item.videoUrl);
+            video.play().catch(() => null);
             return;
         }
 
@@ -1838,17 +2153,35 @@
         return theatre.classList.contains('csrinruSteamTheatreOpen');
     }
 
-    function openTheatre(index) {
-        if (!currentMedia.length) return;
+    function getTheatreSelection(index) {
+        const selectedItem = currentMedia[index];
+        if (!canOpenMediaTheatre(selectedItem)) return null;
 
-        theatreMedia = currentMedia.slice();
-        theatreMediaIndex = (index + theatreMedia.length) % theatreMedia.length;
+        const mode = isVideoMedia(selectedItem) ? 'video' : 'screenshots';
+        const screenshots = currentMedia.filter(isScreenshotMedia);
+        const allItems = currentMedia.filter(canOpenMediaTheatre);
+        const items = mode === 'video' ? [selectedItem, ...screenshots] : screenshots;
+        const selectedIndex = items.indexOf(selectedItem);
+        if (!items.length || selectedIndex < 0) return null;
+
+        return { mode, items, selectedIndex, allItems };
+    }
+
+    function openTheatre(index) {
+        const selection = getTheatreSelection(index);
+        if (!selection) return;
+
+        theatreMode = selection.mode;
+        theatreMedia = selection.items;
+        theatreAllMedia = selection.allItems;
+        theatreMediaIndex = selection.selectedIndex;
         theatreMediaTitle = currentMediaTitle || 'Steam media';
         stopActiveVideo();
         clearTimeout(hideTimeout);
         clearTimeout(displayTimeout);
         clearTimeout(showTimeout);
 
+        theatre.classList.toggle('csrinruSteamTheatreVideoMode', theatreMode === 'video');
         renderTheatre();
         previousDocumentOverflow = document.documentElement.style.overflow;
         document.documentElement.style.overflow = 'hidden';
@@ -1867,12 +2200,17 @@
                 closeButton.focus();
             }
         }
+
+        if (theatreMode === 'video') {
+            playTheatreVideo();
+        }
     }
 
     function closeTheatre() {
         if (!isTheatreOpen()) return;
 
-        if (document.fullscreenElement === theatre) {
+        const fullscreenElement = document.fullscreenElement;
+        if (fullscreenElement && (fullscreenElement === theatre || theatre.contains(fullscreenElement))) {
             document.exitFullscreen().catch(() => null);
         }
 
@@ -1883,8 +2221,11 @@
         document.documentElement.style.overflow = previousDocumentOverflow;
         previousDocumentOverflow = '';
         theatreMedia = [];
+        theatreAllMedia = [];
         theatreMediaIndex = 0;
         theatreMediaTitle = '';
+        theatreMode = 'screenshots';
+        theatre.classList.remove('csrinruSteamTheatreVideoMode');
     }
 
     async function toggleTheatreFullscreen() {
@@ -1904,12 +2245,121 @@
     }
 
     function updateTheatreFullscreenButton() {
-        const button = theatre.querySelector('.csrinruSteamTheatreFullscreenBtn');
-        if (!button) return;
+        const theatreFullscreenButtons = theatre.querySelectorAll('.csrinruSteamTheatreFullscreenBtn');
+        const videoFullscreenButton = theatre.querySelector('.csrinruSteamTheatreVideoFullscreenBtn');
+        const videoWrap = theatre.querySelector('.csrinruSteamTheatreVideoWrap');
 
         const label = document.fullscreenElement === theatre ? 'Exit fullscreen' : 'Enter fullscreen';
-        button.setAttribute('aria-label', label);
-        button.setAttribute('title', label);
+        theatreFullscreenButtons.forEach((button) => {
+            button.setAttribute('aria-label', label);
+            button.setAttribute('title', label);
+        });
+
+        if (videoFullscreenButton) {
+            const videoLabel = document.fullscreenElement === videoWrap ? 'Exit video fullscreen' : 'Enter video fullscreen';
+            videoFullscreenButton.setAttribute('aria-label', videoLabel);
+            videoFullscreenButton.setAttribute('title', videoLabel);
+        }
+    }
+
+    function getTheatreVideoElement() {
+        return theatre.querySelector('.csrinruSteamTheatreVideo');
+    }
+
+    function toggleTheatreVideoPlayback() {
+        const video = getTheatreVideoElement();
+        if (!video) return;
+
+        if (video.paused) {
+            video.play().catch(() => null);
+        } else {
+            video.pause();
+        }
+        updateTheatreVideoControls(video);
+    }
+
+    function toggleTheatreVideoMute() {
+        const video = getTheatreVideoElement();
+        if (!video) return;
+
+        video.muted = !video.muted;
+        updateTheatreVideoControls(video);
+    }
+
+    function seekTheatreVideo(deltaSeconds) {
+        const video = getTheatreVideoElement();
+        if (!video) return false;
+
+        const duration = isFinite(video.duration) ? video.duration : 0;
+        const currentTime = isFinite(video.currentTime) ? video.currentTime : 0;
+        const nextTime = duration ?
+            Math.max(0, Math.min(duration, currentTime + deltaSeconds)) :
+            Math.max(0, currentTime + deltaSeconds);
+        video.currentTime = nextTime;
+        updateTheatreVideoControls(video);
+        return true;
+    }
+
+    function toggleTheatreQualityMenu() {
+        const wrap = theatre.querySelector('.csrinruSteamTheatreQualityWrap');
+        const toggle = theatre.querySelector('.csrinruSteamTheatreQualityToggle');
+        if (!wrap || toggle?.disabled) return;
+
+        wrap.classList.toggle('csrinruSteamTheatreQualityOpen');
+    }
+
+    function setTheatreQualityLevel(button) {
+        if (!button) return;
+
+        if (button.dataset.videoSourceIndex !== undefined) {
+            const item = theatreMedia[theatreMediaIndex];
+            const sources = getTheatreDirectVideoSources(item);
+            const sourceIndex = parseInt(button.dataset.videoSourceIndex, 10);
+            const source = sources[sourceIndex];
+            const video = getTheatreVideoElement();
+            if (!source || !video) return;
+
+            if (theatreActiveHls) {
+                try {
+                    theatreActiveHls.destroy();
+                } catch (_) {
+                    // Ignore cleanup failures from HLS internals.
+                }
+                theatreActiveHls = null;
+            }
+            theatre.querySelectorAll('.csrinruSteamTheatreQualityOption').forEach((option) => {
+                option.classList.toggle('csrinruSteamTheatreQualityActive', option === button);
+            });
+            const wrap = theatre.querySelector('.csrinruSteamTheatreQualityWrap');
+            if (wrap) wrap.classList.remove('csrinruSteamTheatreQualityOpen');
+            loadTheatreVideoSource(video, source.url, true);
+            return;
+        }
+
+        if (!theatreActiveHls) return;
+
+        const level = parseInt(button.dataset.qualityLevel, 10);
+        theatreActiveHls.currentLevel = isNaN(level) ? -1 : level;
+        theatre.querySelectorAll('.csrinruSteamTheatreQualityOption').forEach((option) => {
+            option.classList.toggle('csrinruSteamTheatreQualityActive', option === button);
+        });
+        const wrap = theatre.querySelector('.csrinruSteamTheatreQualityWrap');
+        if (wrap) wrap.classList.remove('csrinruSteamTheatreQualityOpen');
+    }
+
+    async function toggleTheatreVideoFullscreen() {
+        const videoWrap = theatre.querySelector('.csrinruSteamTheatreVideoWrap');
+        if (!videoWrap) return;
+
+        try {
+            if (document.fullscreenElement === videoWrap) {
+                await document.exitFullscreen();
+            } else if (!document.fullscreenElement && videoWrap.requestFullscreen) {
+                await videoWrap.requestFullscreen();
+            }
+        } catch (_) {
+            // Ignore browser fullscreen denials.
+        }
     }
 
     function setActiveMedia(index) {
@@ -1926,6 +2376,11 @@
         const counter = tip.querySelector('.steamMediaCounter');
         if (counter) {
             counter.textContent = `${currentMediaIndex + 1} / ${currentMedia.length}`;
+        }
+
+        const expandButton = tip.querySelector('.steamMediaExpandBtn');
+        if (expandButton) {
+            expandButton.classList.toggle('steamMediaExpandHidden', !canOpenMediaTheatre(currentMedia[currentMediaIndex]));
         }
 
         tip.querySelectorAll('.steamMediaThumbBtn').forEach((button) => {
@@ -2202,6 +2657,13 @@
     });
 
     theatre.addEventListener('click', async (e) => {
+        if (e.target === theatre) {
+            e.preventDefault();
+            e.stopPropagation();
+            closeTheatre();
+            return;
+        }
+
         const closeButton = e.target.closest('.csrinruSteamTheatreCloseBtn');
         if (closeButton) {
             e.preventDefault();
@@ -2210,11 +2672,64 @@
             return;
         }
 
+        const playToggle = e.target.closest('.csrinruSteamTheatreVideoPlayToggle');
+        if (playToggle) {
+            e.preventDefault();
+            e.stopPropagation();
+            toggleTheatreVideoPlayback();
+            return;
+        }
+
+        const muteToggle = e.target.closest('.csrinruSteamTheatreVideoMuteToggle');
+        if (muteToggle) {
+            e.preventDefault();
+            e.stopPropagation();
+            toggleTheatreVideoMute();
+            return;
+        }
+
+        const qualityOption = e.target.closest('.csrinruSteamTheatreQualityOption');
+        if (qualityOption) {
+            e.preventDefault();
+            e.stopPropagation();
+            setTheatreQualityLevel(qualityOption);
+            return;
+        }
+
+        const qualityToggle = e.target.closest('.csrinruSteamTheatreQualityToggle');
+        if (qualityToggle) {
+            e.preventDefault();
+            e.stopPropagation();
+            toggleTheatreQualityMenu();
+            return;
+        }
+
         const fullscreenButton = e.target.closest('.csrinruSteamTheatreFullscreenBtn');
         if (fullscreenButton) {
             e.preventDefault();
             e.stopPropagation();
             await toggleTheatreFullscreen();
+            return;
+        }
+
+        const videoFullscreenButton = e.target.closest('.csrinruSteamTheatreVideoFullscreenBtn');
+        if (videoFullscreenButton) {
+            e.preventDefault();
+            e.stopPropagation();
+            await toggleTheatreVideoFullscreen();
+            return;
+        }
+
+        const videoSurface = e.target.closest('.csrinruSteamTheatreVideo');
+        if (videoSurface) {
+            e.preventDefault();
+            e.stopPropagation();
+            try {
+                videoSurface.focus({ preventScroll: true });
+            } catch (_) {
+                videoSurface.focus();
+            }
+            toggleTheatreVideoPlayback();
             return;
         }
 
@@ -2234,26 +2749,19 @@
             return;
         }
 
-        const thumbButton = e.target.closest('.csrinruSteamTheatreThumbBtn');
-        if (thumbButton) {
-            e.preventDefault();
-            e.stopPropagation();
-            const index = parseInt(thumbButton.dataset.theatreMediaIndex, 10);
-            if (!isNaN(index)) {
-                setTheatreMedia(index);
-            }
-            return;
-        }
+    });
 
-        const playButton = e.target.closest('.csrinruSteamTheatrePlayBtn');
-        if (playButton) {
-            e.preventDefault();
-            e.stopPropagation();
-            const index = parseInt(playButton.dataset.theatreMediaIndex, 10);
-            if (!isNaN(index) && index !== theatreMediaIndex) {
-                setTheatreMedia(index);
-            }
-            await playTheatreVideo();
+    theatre.addEventListener('input', (e) => {
+        const seek = e.target.closest('.csrinruSteamTheatreVideoSeek');
+        if (!seek) return;
+
+        const video = getTheatreVideoElement();
+        if (!video) return;
+
+        const value = parseFloat(seek.value);
+        if (!isNaN(value)) {
+            video.currentTime = value;
+            updateTheatreVideoControls(video);
         }
     });
 
@@ -2264,6 +2772,28 @@
             e.preventDefault();
             closeTheatre();
             return;
+        }
+
+        if (e.target.closest?.('.csrinruSteamTheatreVideoControls')) return;
+
+        if (theatreMode === 'video' && isVideoMedia(theatreMedia[theatreMediaIndex])) {
+            if (e.key === 'ArrowLeft') {
+                e.preventDefault();
+                seekTheatreVideo(-5);
+                return;
+            }
+
+            if (e.key === 'ArrowRight') {
+                e.preventDefault();
+                seekTheatreVideo(5);
+                return;
+            }
+
+            if (e.key === ' ' || e.key === 'Spacebar') {
+                e.preventDefault();
+                toggleTheatreVideoPlayback();
+                return;
+            }
         }
 
         if (e.key === 'ArrowLeft') {
