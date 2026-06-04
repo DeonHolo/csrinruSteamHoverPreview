@@ -9,5 +9,8 @@ Thumbs.db
 # Editor folders
 .vscode/
 
+# Local brainstorming mockups
+.superpowers/
+
 # Local project notes
 CHAT_NOTES_2026-06-01.md
