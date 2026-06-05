@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         CS.RIN.RU - Steam Hover Preview
 // @namespace    https://greasyfork.org/en/users/1340389-deonholo
-// @version      3.1
+// @version      3.2
 // @description  On-hover Steam media, description, ratings, tags, AppID, SteamDB, Open on Steam, and Open Latest Page for cs.rin.ru forum topics
 // @author       DeonHolo
 // @license      MIT
@@ -61,6 +61,7 @@
     let currentMediaIndex = 0;
     let currentMediaTitle = '';
     let currentStoreUrl = '';
+    let currentLatestUrl = '';
     let theatreMedia = [];
     let theatreMediaIndex = 0;
     let theatreMediaTitle = '';
@@ -209,7 +210,7 @@
             opacity: 0;
             max-width: 420px;
             padding: 8px;
-            background: rgba(28, 28, 28, 0.98);
+            background: rgb(28, 28, 28);
             border: 1px solid #5c5c5c;
             border-radius: 4px;
             box-shadow: 0 2px 8px rgba(0, 0, 0, 0.45);
@@ -832,6 +833,38 @@
         }
         .csrinruSteamTheatreVideoMode .csrinruSteamTheatreFooter {
             padding: 7px 72px 8px;
+        }
+        .csrinruSteamTheatreFooterActions {
+            position: absolute;
+            top: 50%;
+            left: 18px;
+            display: flex;
+            align-items: center;
+            gap: 14px;
+            max-width: calc(50% - 72px);
+            min-width: 0;
+            overflow: hidden;
+            transform: translateY(-50%);
+        }
+        .csrinruSteamTheatreFooterActions a {
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+            min-width: 0;
+            overflow: hidden;
+            color: #99d2f7 !important;
+            font: 12px/1.35 Arial, Helvetica, sans-serif;
+            text-decoration: underline;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+            opacity: 0.92;
+            touch-action: manipulation;
+        }
+        .csrinruSteamTheatreFooterActions a:hover,
+        .csrinruSteamTheatreFooterActions a:focus {
+            color: #c7ebff !important;
+            opacity: 1;
+            outline: none;
         }
         .csrinruSteamTheatreCounter {
             color: #9fb0bf;
@@ -1690,6 +1723,7 @@
         currentMediaIndex = 0;
         currentMediaTitle = '';
         currentStoreUrl = '';
+        currentLatestUrl = '';
     }
 
     function getRenderMedia(data) {
@@ -1857,6 +1891,21 @@
         `;
     }
 
+    function renderTheatreFooterActions() {
+        const steamUrl = getUsableMediaUrl(currentStoreUrl);
+        const latestUrl = getUsableMediaUrl(currentLatestUrl);
+        const steamAction = steamUrl ?
+            `<a href="${escapeHtml(steamUrl)}" target="_blank" rel="noopener noreferrer">🎮 Open on Steam</a>` :
+            '';
+        const latestAction = latestUrl ?
+            `<a href="${escapeHtml(latestUrl)}" target="_blank" rel="noopener noreferrer">↗️ Open Latest Page</a>` :
+            '';
+
+        return steamAction || latestAction ?
+            `<div class="csrinruSteamTheatreFooterActions">${steamAction}${latestAction}</div>` :
+            '';
+    }
+
     function renderTheatre() {
         if (!theatreMedia.length) return;
 
@@ -1867,6 +1916,7 @@
         ` : '';
         const videoControlsHtml = isVideoMedia(theatreMedia[theatreMediaIndex]) ? renderTheatreVideoControls() : '';
         const footerControlsHtml = renderTheatreFooterControls();
+        const footerActionsHtml = renderTheatreFooterActions();
 
         theatre.innerHTML = `
             <div class="csrinruSteamTheatreShell">
@@ -1882,6 +1932,7 @@
                 </div>
                 ${videoControlsHtml}
                 <div class="csrinruSteamTheatreFooter">
+                    ${footerActionsHtml}
                     <div class="csrinruSteamTheatreCounter" aria-live="polite">${getTheatreCounterText()}</div>
                     <div class="csrinruSteamTheatreFooterControlsHost">${footerControlsHtml}</div>
                 </div>
@@ -2393,6 +2444,7 @@
         currentMediaIndex = 0;
         currentMediaTitle = data.name || gameName;
         currentStoreUrl = rawStoreUrl;
+        currentLatestUrl = topicInfo.latestUrl || '';
 
         tip.innerHTML = `
             ${mediaHtml}
