@@ -27,8 +27,7 @@ In scope:
 - Show screenshots as images.
 - Show videos as poster thumbnails with a play affordance.
 - Open trailers in theatre mode as real video playback immediately, not as enlarged poster thumbnails.
-- Add Steam-like bottom video controls for play/pause, mute, seek, quality, theatre fullscreen, and video fullscreen.
-- Add a quality picker behind a bottom-right cog control when `hls.js` exposes selectable HLS levels or Steam provides multiple direct MP4/WebM files.
+- Add Steam-like bottom video controls for play/pause, mute, seek, and video fullscreen.
 - Replace a video poster with a playable video only after the user explicitly clicks it.
 - Keep the existing title, release date, AppID, SteamDB, thread tags, description, rating, Steam tags/genres, and action links below the media.
 - Keep long CS.RIN.RU thread tags bold and allow them to use available metadata-row width before truncating.
@@ -60,7 +59,7 @@ The implementation will build a normalized `media` array during Steam data assem
 
 The header image is always first when present. Videos follow so trailers are discoverable without walking through a long screenshot list. Screenshots come after videos.
 
-Movie entries prefer a web-compatible MP4/WebM URL from Steam's movie data when available and keep the available direct file variants for the theatre quality menu. Current Steam responses often expose trailers as `hls_h264` manifests too, so the implementation accepts HLS movie entries and uses HLS levels when `hls.js` exposes them. If no direct video or HLS source exists, the implementation skips that movie item rather than adding a broken control.
+Movie entries prefer a web-compatible MP4/WebM URL from Steam's movie data when available. Theatre playback tries direct MP4/WebM files first because direct Steam trailer files are the only reliable inline trailer path on CS.RIN.RU in Chromium. Current Steam responses often expose trailers only as `hls_h264` or DASH manifests; those entries remain visible as video thumbnails, but HLS playback is only attempted when the browser reports native HLS support. Chromium requires a `blob:` MediaSource URL for hls.js/MSE playback, and CS.RIN.RU's page CSP blocks that `blob:` media URL, so HLS-only trailers fall back to an explicit Open on Steam link instead of a dead player.
 
 ## UX Design
 
@@ -77,7 +76,7 @@ Use an overlay-control carousel inside a slightly wider top media area:
 - A small expand control sits over screenshots and video posters only; it is hidden on the Steam header art.
 - Video items show a centered play affordance over the poster.
 - Clicking the poster/play affordance loads and plays the video.
-- HLS trailers use native browser playback when available; otherwise a pinned `hls.js` userscript dependency handles playback in Chromium-like browsers.
+- HLS trailers use native browser playback when available; Chromium on CS.RIN.RU shows an Open on Steam fallback for HLS-only trailers because the page CSP blocks the `blob:` media URL required by hls.js/MSE.
 - Clicking a thumbnail switches the main media frame without opening Steam or hiding the tooltip.
 - Clicking carousel arrows never opens Steam and never hides the tooltip.
 - The default hover state still looks like today's preview: the header image is visible with no required interaction.
@@ -92,10 +91,11 @@ Theatre mode uses a centered dark overlay inspired by Steam's screenshots/traile
 - Screenshot theatre counts videos and screenshots in the footer index, but skips videos during screenshot navigation.
 - Opening theatre from a video creates a player for that clicked video plus the screenshot gallery.
 - Video theatre renders a real `video` element immediately with custom Steam-like bottom controls, autoplay, and no enlarged poster screen.
+- Normal video theatre controls render as their own full-width row between the video stage and the theatre counter footer, so they cannot be clipped or hidden by the footer. Video-only fullscreen keeps a separate full-width overlay inside the fullscreen video wrapper.
 - Video theatre can navigate from the launched trailer into screenshots, but does not expose other trailers unless the user opened that trailer directly from the hover card.
 - Once video theatre moves into a screenshot, the session becomes screenshot-only; navigation cannot return to the launched video.
 - Header bar shows the game title and `Trailers & Screenshots`.
-- Close sits in the header; screenshot fullscreen sits in the footer, while theatre fullscreen, video fullscreen, and quality controls sit in the bottom video controls for trailers.
+- Close sits in the header; screenshot footer controls include fullscreen, while video controls include video fullscreen.
 - Normal theatre mode is a centered Steam-sized modal; browser fullscreen expands the theatre overlay to the full display.
 - Video fullscreen expands the video/player surface while preserving the custom controls.
 - Clicking the backdrop outside the centered modal closes theatre mode.
@@ -113,7 +113,7 @@ Carousel state is local to the currently rendered tooltip.
 - Clicking the hover-card expand button opens theatre mode at the current screenshot or trailer.
 - The expand button is not shown for the Steam header image.
 - Screenshot theatre supports close, previous, next, and fullscreen controls.
-- Video theatre supports close, one-way navigation to screenshots, theatre fullscreen, video fullscreen, custom video controls, and HLS quality selection when available.
+- Video theatre supports close, one-way navigation to screenshots, video fullscreen, and custom video controls.
 - Theatre mode supports `Escape` to close and arrow keys to navigate.
 - Video theatre uses Left/Right keyboard input for video seeking instead of screenshot navigation while the video is active.
 - Clicking the active theatre video toggles play/pause.
@@ -123,7 +123,7 @@ Carousel state is local to the currently rendered tooltip.
 - Video loading starts only after that explicit click.
 - Moving to another carousel item stops and removes the active video element.
 - Hiding the tooltip stops and removes any active video element.
-- Closing theatre mode stops and removes any active theatre video/HLS instance.
+- Closing theatre mode stops and removes any active theatre video instance.
 
 ## Performance
 
@@ -137,9 +137,10 @@ The hover must stay fast:
 - Use image URLs from the Steam API response and let the browser load visible media images and thumbnail images.
 - Keep the media frame dimensions stable to avoid tooltip layout jumps.
 - Do not create hidden video elements for thumbnails.
-- Do not initialize HLS playback until the user clicks a video poster.
-- Do not initialize theatre HLS playback until the user explicitly opens a trailer in theatre mode.
-- Keep trailer quality selection on `Auto` by default for HLS playback, and use the highest direct MP4/WebM source by default for direct-file playback.
+- Do not initialize native HLS playback until the user clicks a video poster.
+- Do not initialize theatre native HLS playback until the user explicitly opens a trailer in theatre mode.
+- Do not use hls.js/MSE on CS.RIN.RU because the page CSP blocks `blob:` media URLs.
+- Use the highest direct MP4/WebM source by default for direct-file playback.
 - Lock document scrolling only while theatre mode is open, then restore it on close.
 
 Since media metadata comes from the same `appdetails` response already used for descriptions, release dates, and other details, the main new cost is rendering and loading the visible media asset.
@@ -160,11 +161,11 @@ Media metadata is part of the successful Steam data object and follows the exist
 - If no media is available, omit the media frame.
 - If a screenshot fails to load, hide that image and continue showing the rest of the card.
 - If a video fails to load, keep the poster visible and do not retry automatically.
+- If a trailer has only HLS/DASH sources that Chromium cannot play inline on CS.RIN.RU, show a short fallback message with an Open on Steam link instead of a dead video player.
 - If a media URL is malformed, skip that item while normalizing media.
 - If there is only one media item, hide carousel controls, counter, and thumbnail strip.
 - If fullscreen is denied by the browser, keep theatre mode open normally.
-- If HLS quality levels are unavailable but multiple direct video files are available, let the cog switch between those direct sources.
-- If only one playable video source is available, keep the cog quality control disabled.
+- If multiple direct video files are available, use the preferred highest-quality direct source selected during media normalization.
 
 ## Code Organization
 
@@ -179,9 +180,8 @@ Add small helpers instead of folding the carousel into the existing render funct
 - `renderTheatre()` renders the centered media overlay.
 - `setTheatreMedia(index)` updates the visible theatre media item.
 - `getTheatreSelection(index)` filters the hover media into Steam-like theatre collections: screenshots-only when launched from a screenshot, or the launched video plus screenshots when launched from a video.
-- `playTheatreVideo()` handles direct/HLS playback in video theatre mode.
-- `populateTheatreQualityMenu(hls)` enables HLS quality choices in the cog menu when levels are available.
-- `populateTheatreDirectQualityMenu(item, activeUrl)` enables direct MP4/WebM source choices when HLS levels are unavailable.
+- `playTheatreVideo()` handles direct video playback, native HLS when supported, and the Steam fallback message when inline playback is blocked.
+- Direct MP4/WebM video sources are tried before native HLS to avoid avoidable Steam HLS failures.
 - `closeTheatre()` stops playback, clears theatre state, and restores page scrolling.
 
 Event handling stays delegated from the tooltip:
@@ -191,7 +191,7 @@ Event handling stays delegated from the tooltip:
 - `.steamMediaThumbBtn` selects a media index.
 - `.steamMediaPlayBtn` loads the selected video.
 - `.steamMediaExpandBtn` opens theatre mode only for screenshots and videos.
-- `.csrinruSteamTheatre*` controls handle theatre close, fullscreen, navigation, custom video controls, and HLS quality selection.
+- `.csrinruSteamTheatre*` controls handle theatre close, fullscreen, navigation, and custom video controls.
 - Existing AppID copy behavior must remain independent.
 
 ## Testing
@@ -205,7 +205,7 @@ Manual checks:
 - Click next/previous and confirm screenshots cycle without hiding the tooltip.
 - Hover a game with videos and confirm video items show as posters with a play affordance.
 - Click a video poster and confirm the video loads only after the click.
-- Confirm HLS-only Steam movie entries still appear as video thumbnails.
+- Confirm HLS-only Steam movie entries still appear as video thumbnails and show the Open on Steam fallback when inline playback is blocked.
 - Navigate away from a video item and confirm playback stops.
 - Hide the tooltip while a video is playing and confirm playback stops.
 - Confirm the theatre button is hidden on the Steam header image.
@@ -213,15 +213,14 @@ Manual checks:
 - Confirm screenshot theatre does not include the Steam header or navigable trailers.
 - Confirm screenshot theatre counts hidden trailers in the footer index, matching Steam's `3 of N` behavior.
 - Navigate screenshot theatre with buttons and keyboard arrows.
-- Open theatre from a trailer and confirm the real video player appears immediately with custom controls.
+- Open theatre from a direct-file trailer and confirm the real video player appears immediately with custom controls.
 - Confirm video theatre does not show enlarged low-resolution trailer thumbnails.
 - Confirm video theatre can navigate from the launched trailer into screenshots, but not into other trailers.
 - Confirm navigating from a trailer into screenshots removes the trailer from the theatre navigation loop.
 - Confirm clicking outside the theatre modal closes it.
 - Confirm clicking the active theatre video toggles play/pause.
 - Confirm Left/Right keys seek the active theatre video instead of changing media.
-- Confirm custom video controls show play/pause, mute, seek time, cog quality, theatre fullscreen, and video fullscreen controls.
-- Confirm the cog quality menu enables when HLS quality levels or multiple direct MP4/WebM files are available, and stays disabled only when there is one playable source.
+- Confirm custom video controls show play/pause, mute, seek time, and video fullscreen controls.
 - Toggle browser fullscreen from theatre mode and confirm Esc exits/closes cleanly.
 - Toggle video fullscreen from the video controls when available.
 - Close theatre mode and confirm video playback stops and page scrolling is restored.

@@ -34,7 +34,7 @@ A userscript that displays Steam game information when hovering over game topic 
    - [Greasemonkey](https://www.greasespot.net/)
 
 2. Install the script:
-   - Install from Greasy Fork when published
+   - **[Install from Greasy Fork](https://greasyfork.org/en/scripts/580613-cs-rin-ru-steam-hover-preview)** (Recommended)
    - Or copy `csrinruSteamHoverPreview.user.js` manually from this repo
 
 ## Supported Sites
